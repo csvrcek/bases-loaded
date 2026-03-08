@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""CDK app entry point for Bases Loaded infrastructure."""
+
+import aws_cdk as cdk
+
+from stacks.shared_stack import SharedStack
+from stacks.ingestion_stack import IngestionStack
+from stacks.processing_stack import ProcessingStack
+from stacks.ml_stack import MlStack
+from stacks.inference_stack import InferenceStack
+
+app = cdk.App()
+
+env = cdk.Environment(
+    account=app.node.try_get_context("account"),
+    region=app.node.try_get_context("region") or "us-east-1",
+)
+
+# --- Shared resources (S3, DynamoDB) ---
+shared = SharedStack(app, "BasesLoadedShared", env=env)
+
+# --- Pillar stacks ---
+IngestionStack(
+    app,
+    "BasesLoadedIngestion",
+    data_bucket=shared.data_bucket,
+    env=env,
+)
+
+ProcessingStack(
+    app,
+    "BasesLoadedProcessing",
+    data_bucket=shared.data_bucket,
+    game_day_table=shared.game_day_table,
+    env=env,
+)
+
+MlStack(
+    app,
+    "BasesLoadedMl",
+    models_bucket=shared.models_bucket,
+    game_day_table=shared.game_day_table,
+    env=env,
+)
+
+InferenceStack(
+    app,
+    "BasesLoadedInference",
+    models_bucket=shared.models_bucket,
+    game_day_table=shared.game_day_table,
+    env=env,
+)
+
+app.synth()

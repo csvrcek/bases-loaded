@@ -1,0 +1,45 @@
+name: Deploy Processing Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "processing/**"
+      - "shared/**"
+      - "infra/stacks/processing_stack.py"
+      - ".github/workflows/deploy-processing.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install CDK dependencies
+        run: pip install -r infra/requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: CDK deploy processing stack
+        working-directory: infra
+        run: cdk deploy BasesLoadedProcessing --require-approval never
