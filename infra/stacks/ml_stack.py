@@ -53,7 +53,7 @@ class MlStack(Stack):
         id: str,
         models_bucket: s3.IBucket,
         game_day_table: dynamodb.ITable,
-        repo_owner: str = "your-github-user",
+        repo_owner: str = "csvrcek",
         repo_name: str = "bases-loaded",
         **kwargs,
     ) -> None:
