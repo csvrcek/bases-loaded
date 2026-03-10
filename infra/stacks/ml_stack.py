@@ -8,11 +8,10 @@ from aws_cdk import (
     Duration,
     Stack,
     aws_ec2 as ec2,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_iam as iam,
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
+    aws_scheduler as scheduler,
 )
 from constructs import Construct
 
@@ -134,20 +133,7 @@ class MlStack(Stack):
 
         Tags.of(launch_template).add("Project", "bases-loaded")
 
-        # --- EventBridge rule: trigger weekly training ---
-
-        # The target uses RunInstances API via a Lambda-backed custom resource
-        # For simplicity, we use a Step Functions state machine to call RunInstances
-        training_rule = events.Rule(
-            self,
-            "WeeklyTrainingRule",
-            schedule=events.Schedule.cron(
-                week_day="MON",
-                hour="6",
-                minute="0",
-            ),
-            description="Trigger weekly ML model training every Monday at 6 AM UTC",
-        )
+        # --- EventBridge Scheduler: trigger weekly training ---
 
         # --- Lambda to launch the Spot Instance ---
 
@@ -213,4 +199,24 @@ def handler(event, context):
             timeout=Duration.seconds(30),
         )
 
-        training_rule.add_target(targets.LambdaFunction(launcher_fn))
+        scheduler_role = iam.Role(
+            self,
+            "SchedulerRole",
+            assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"),
+        )
+        launcher_fn.grant_invoke(scheduler_role)
+
+        scheduler.CfnSchedule(
+            self,
+            "WeeklyTrainingSchedule",
+            schedule_expression="cron(0 6 ? * MON *)",
+            schedule_expression_timezone="UTC",
+            description="Trigger weekly ML model training every Monday at 6 AM UTC",
+            flexible_time_window=scheduler.CfnSchedule.FlexibleTimeWindowProperty(
+                mode="OFF",
+            ),
+            target=scheduler.CfnSchedule.TargetProperty(
+                arn=launcher_fn.function_arn,
+                role_arn=scheduler_role.role_arn,
+            ),
+        )

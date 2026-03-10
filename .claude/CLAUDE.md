@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 # currentDate
-Today's date is 2026-03-07.
+Today's date is 2026-03-09.
 
 ## Project: Bases Loaded
 An automated MLB game outcome prediction pipeline that ingests baseball data, engineers features, trains an XGBoost model, and delivers win-probability predictions via email one hour before first pitch.
@@ -47,21 +47,22 @@ docs/            # Architecture and feature specs
 
 ## Commands
 - **Run ML training:** `python -m ml.train` (from repo root)
-- **Install ML deps:** `pip install -r ml/requirements.txt`
-- **Install CDK deps:** `pip install -r infra/requirements.txt`
-- **CDK synth:** `cd infra && cdk synth`
+- **Install ML deps:** `source ml/.venv/bin/activate && pip install -r ml/requirements.txt`
+- **Install CDK deps:** `source infra/.venv/bin/activate && pip install -r infra/requirements.txt`
+- **CDK synth:** `source infra/.venv/bin/activate && cd infra && cdk synth`
 - **CDK deploy (all):** `cd infra && cdk deploy --all`
 - **CDK deploy (one stack):** `cd infra && cdk deploy BasesLoadedMl`
 
 ## Deployment
 - **IaC:** AWS CDK with one stack per pillar plus a shared stack
-- **CDK stacks:** `BasesLoadedShared`, `BasesLoadedIngestion`, `BasesLoadedProcessing`, `BasesLoadedMl`, `BasesLoadedInference`
+- **CDK stacks:** `BasesLoadedGitHubOidc`, `BasesLoadedShared`, `BasesLoadedIngestion`, `BasesLoadedProcessing`, `BasesLoadedMl`, `BasesLoadedInference`
 - **CI/CD:** GitHub Actions with path-filtered workflows — changes to a pillar only deploy that pillar's stack
 - **Auth:** OIDC role assumption via `AWS_DEPLOY_ROLE_ARN` secret (no long-lived keys)
 - All workflows also trigger on `shared/` changes since shared code affects all pillars
 
 ## Conventions
-- Monorepo: each pillar is a top-level Python package with its own `requirements.txt`
+- Monorepo: each pillar is a top-level Python package with its own `requirements.txt` and `.venv/`
+- Each module uses a local virtual environment at `<module>/.venv/` — always activate before running commands
 - `shared/` contains cross-cutting AWS helpers (DynamoDB, S3) and central config
 - Feature schema codified in `ml/config.py`, sourced from `docs/features.md`
 - Run modules from repo root with `python -m <package>.<module>`

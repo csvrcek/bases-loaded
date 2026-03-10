@@ -1,12 +1,12 @@
-name: Deploy Shared Infrastructure
+name: Deploy GitHub OIDC Stack
 
 on:
   push:
     branches: [main]
     paths:
-      - "infra/stacks/shared_stack.py"
+      - "infra/stacks/github_oidc_stack.py"
       - "infra/app.py"
-      - ".github/workflows/deploy-shared.yml"
+      - ".github/workflows/deploy-github-oidc.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,6 +39,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-2
 
-      - name: CDK deploy shared stack
+      - name: CDK deploy GitHub OIDC stack
         working-directory: infra
-        run: cdk deploy BasesLoadedShared --require-approval never
+        run: cdk deploy BasesLoadedGitHubOidc --require-approval never

@@ -3,6 +3,7 @@
 
 import aws_cdk as cdk
 
+from stacks.github_oidc_stack import GitHubOidcStack
 from stacks.shared_stack import SharedStack
 from stacks.ingestion_stack import IngestionStack
 from stacks.processing_stack import ProcessingStack
@@ -13,8 +14,11 @@ app = cdk.App()
 
 env = cdk.Environment(
     account=app.node.try_get_context("account"),
-    region=app.node.try_get_context("region") or "us-east-1",
+    region=app.node.try_get_context("region") or "us-east-2",
 )
+
+# --- GitHub OIDC + deploy role ---
+GitHubOidcStack(app, "BasesLoadedGitHubOidc", env=env)
 
 # --- Shared resources (S3, DynamoDB) ---
 shared = SharedStack(app, "BasesLoadedShared", env=env)
