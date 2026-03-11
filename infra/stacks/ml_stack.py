@@ -94,15 +94,14 @@ class MlStack(Stack):
         # --- Launch Template for Spot Instance ---
 
         user_data_script = (RUNTIME_DIR / "training_user_data.sh").read_text()
-        user_data = ec2.UserData.for_linux()
-        user_data.add_commands(
-            user_data_script.format(
-                repo_owner=repo_owner,
-                repo_name=repo_name,
-                region=self.region,
-                sns_topic_arn=self.notifications_topic.topic_arn,
-            )
+        user_data_script = (
+            user_data_script.replace("{repo_owner}", repo_owner)
+            .replace("{repo_name}", repo_name)
+            .replace("{region}", self.region)
+            .replace("{sns_topic_arn}", self.notifications_topic.topic_arn)
         )
+        user_data = ec2.UserData.for_linux()
+        user_data.add_commands(user_data_script)
 
         launch_template = ec2.LaunchTemplate(
             self,
