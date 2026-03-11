@@ -6,6 +6,7 @@ on:
     paths:
       - "ingestion/**"
       - "shared/**"
+      - "infra/app.py"
       - "infra/stacks/ingestion_stack.py"
       - ".github/workflows/deploy-ingestion.yml"
   workflow_dispatch:

@@ -6,6 +6,7 @@ on:
     paths:
       - "ml/**"
       - "shared/**"
+      - "infra/app.py"
       - "infra/stacks/ml_stack.py"
       - ".github/workflows/deploy-ml.yml"
   workflow_dispatch:

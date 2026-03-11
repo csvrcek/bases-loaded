@@ -6,6 +6,7 @@ on:
     paths:
       - "inference/**"
       - "shared/**"
+      - "infra/app.py"
       - "infra/stacks/inference_stack.py"
       - ".github/workflows/deploy-inference.yml"
   workflow_dispatch:

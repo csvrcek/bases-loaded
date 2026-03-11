@@ -6,6 +6,7 @@ on:
     paths:
       - "processing/**"
       - "shared/**"
+      - "infra/app.py"
       - "infra/stacks/processing_stack.py"
       - ".github/workflows/deploy-processing.yml"
   workflow_dispatch:
