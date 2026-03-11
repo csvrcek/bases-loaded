@@ -1,6 +1,7 @@
 {
   "app": "python3 app.py",
   "context": {
-    "@aws-cdk/core:stackRelativeExports": true
+    "@aws-cdk/core:stackRelativeExports": true,
+    "notification_email": "connorsvrcek@gmail.com"
   }
 }

@@ -4,45 +4,24 @@ The instance bootstraps itself via user data, runs the training pipeline,
 uploads the model to S3, then terminates itself.
 """
 
+from pathlib import Path
+
 from aws_cdk import (
     Duration,
     Stack,
     aws_ec2 as ec2,
     aws_iam as iam,
+    aws_lambda as _lambda,
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
     aws_scheduler as scheduler,
+    aws_sns as sns,
+    aws_sns_subscriptions as subs,
+    Tags,
 )
 from constructs import Construct
 
-
-TRAINING_USER_DATA = """#!/bin/bash
-set -euo pipefail
-
-# Log everything for debugging
-exec > /var/log/ml-training.log 2>&1
-
-echo "Starting ML training pipeline..."
-
-# Install dependencies
-yum update -y
-yum install -y python3.11 python3.11-pip git
-
-# Clone repo and install deps
-cd /tmp
-git clone https://github.com/{repo_owner}/{repo_name}.git bases-loaded
-cd bases-loaded
-python3.11 -m pip install -r ml/requirements.txt
-
-# Run training
-python3.11 -m ml.train
-
-echo "Training complete. Shutting down..."
-
-# Self-terminate
-INSTANCE_ID=$(ec2-metadata -i | cut -d' ' -f2)
-aws ec2 terminate-instances --instance-ids $INSTANCE_ID --region {region}
-"""
+RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
 
 
 class MlStack(Stack):
@@ -57,6 +36,19 @@ class MlStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
+
+        # --- SNS Topic for pipeline notifications ---
+
+        self.notifications_topic = sns.Topic(
+            self,
+            "MlPipelineNotifications",
+            topic_name="bases-loaded-ml-notifications",
+        )
+        notification_email = self.node.try_get_context("notification_email")
+        if notification_email:
+            self.notifications_topic.add_subscription(
+                subs.EmailSubscription(notification_email)
+            )
 
         # --- IAM Role for EC2 training instance ---
 
@@ -76,6 +68,9 @@ class MlStack(Stack):
 
         # Write model artifact to S3
         models_bucket.grant_write(training_role)
+
+        # Publish training notifications
+        self.notifications_topic.grant_publish(training_role)
 
         # Allow self-termination
         training_role.add_to_policy(
@@ -98,12 +93,14 @@ class MlStack(Stack):
 
         # --- Launch Template for Spot Instance ---
 
+        user_data_script = (RUNTIME_DIR / "training_user_data.sh").read_text()
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
-            TRAINING_USER_DATA.format(
+            user_data_script.format(
                 repo_owner=repo_owner,
                 repo_name=repo_name,
                 region=self.region,
+                sns_topic_arn=self.notifications_topic.topic_arn,
             )
         )
 
@@ -128,16 +125,9 @@ class MlStack(Stack):
             ],
         )
 
-        # Tag for self-termination scoping
-        from aws_cdk import Tags
-
         Tags.of(launch_template).add("Project", "bases-loaded")
 
-        # --- EventBridge Scheduler: trigger weekly training ---
-
         # --- Lambda to launch the Spot Instance ---
-
-        from aws_cdk import aws_lambda as _lambda
 
         launcher_role = iam.Role(
             self,
@@ -166,38 +156,12 @@ class MlStack(Stack):
             "SpotLauncherFn",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="index.handler",
-            code=_lambda.Code.from_inline(
-                f"""
-import boto3
-import os
-
-ec2 = boto3.client("ec2")
-
-def handler(event, context):
-    response = ec2.run_instances(
-        LaunchTemplate={{
-            "LaunchTemplateName": "bases-loaded-ml-training",
-        }},
-        MinCount=1,
-        MaxCount=1,
-        TagSpecifications=[
-            {{
-                "ResourceType": "instance",
-                "Tags": [
-                    {{"Key": "Name", "Value": "bases-loaded-ml-training"}},
-                    {{"Key": "Project", "Value": "bases-loaded"}},
-                ],
-            }}
-        ],
-    )
-    instance_id = response["Instances"][0]["InstanceId"]
-    print(f"Launched training instance: {{instance_id}}")
-    return {{"instance_id": instance_id}}
-"""
-            ),
+            code=_lambda.Code.from_asset(str(RUNTIME_DIR / "spot_launcher")),
             role=launcher_role,
             timeout=Duration.seconds(30),
         )
+
+        # --- EventBridge Scheduler: trigger weekly training ---
 
         scheduler_role = iam.Role(
             self,
@@ -209,9 +173,9 @@ def handler(event, context):
         scheduler.CfnSchedule(
             self,
             "WeeklyTrainingSchedule",
-            schedule_expression="cron(0 6 ? * MON *)",
+            schedule_expression="cron(0 11 ? * MON *)",
             schedule_expression_timezone="UTC",
-            description="Trigger weekly ML model training every Monday at 6 AM UTC",
+            description="Trigger weekly ML model training every Monday at 11 AM UTC",
             flexible_time_window=scheduler.CfnSchedule.FlexibleTimeWindowProperty(
                 mode="OFF",
             ),
