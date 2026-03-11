@@ -11,6 +11,7 @@ from stacks.ml_stack import MlStack
 from stacks.inference_stack import InferenceStack
 
 app = cdk.App()
+cdk.Tags.of(app).add("Project", "bases-loaded")
 
 env = cdk.Environment(
     account=app.node.try_get_context("account"),
