@@ -1,0 +1,3 @@
+MLB-StatsAPI
+polars
+boto3

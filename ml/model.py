@@ -4,7 +4,12 @@ import polars as pl
 import xgboost as xgb
 from sklearn.metrics import brier_score_loss, log_loss
 
-from ml.config import EARLY_STOPPING_ROUNDS, NUM_BOOST_ROUNDS
+from ml.config import (
+    EARLY_STOPPING_ROUNDS,
+    MAX_BRIER_SCORE,
+    MAX_LOG_LOSS,
+    NUM_BOOST_ROUNDS,
+)
 
 
 def train_model(

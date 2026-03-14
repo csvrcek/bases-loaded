@@ -1,0 +1,4 @@
+requests
+MLB-StatsAPI
+polars
+boto3

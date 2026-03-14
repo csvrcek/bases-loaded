@@ -61,20 +61,51 @@ ALL_NUMERIC_FEATURES = NUMERIC_FEATURES + CONTEXTUAL_NUMERIC + BINARY_FEATURES
 
 # --- XGBoost hyperparameters ---
 
-XGBOOST_PARAMS = {
-    "objective": "binary:logistic",
-    "eval_metric": "logloss",
-    "tree_method": "hist",
-    "max_depth": 5,
-    "learning_rate": 0.05,
-    "subsample": 0.8,
-    "colsample_bytree": 0.8,
-    "min_child_weight": 3,
-    "seed": 42,
-}
+XGBOOST_PARAM_SETS = [
+    {   # Default: balanced
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "max_depth": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "min_child_weight": 3,
+        "seed": 42,
+    },
+    {   # Shallower trees, slower learning
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "max_depth": 3,
+        "learning_rate": 0.02,
+        "subsample": 0.7,
+        "colsample_bytree": 0.7,
+        "min_child_weight": 5,
+        "seed": 42,
+    },
+    {   # Deeper trees, more regularization
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "max_depth": 7,
+        "learning_rate": 0.03,
+        "subsample": 0.9,
+        "colsample_bytree": 0.6,
+        "min_child_weight": 5,
+        "reg_alpha": 0.1,
+        "reg_lambda": 2.0,
+        "seed": 42,
+    },
+]
 
 NUM_BOOST_ROUNDS = 500
 EARLY_STOPPING_ROUNDS = 20
+
+# --- Evaluation thresholds (fail pipeline if exceeded) ---
+
+MAX_LOG_LOSS = 0.70
+MAX_BRIER_SCORE = 0.26
 
 # --- Train/validation split ---
 
