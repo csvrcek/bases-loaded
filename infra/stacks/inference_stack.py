@@ -8,6 +8,7 @@ from aws_cdk import (
     Stack,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
+    aws_sns as sns,
 )
 from constructs import Construct
 
@@ -19,6 +20,7 @@ class InferenceStack(Stack):
         id: str,
         models_bucket: s3.IBucket,
         game_day_table: dynamodb.ITable,
+        notifications_topic: sns.ITopic,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)

@@ -19,7 +19,6 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_scheduler as scheduler,
     aws_sns as sns,
-    aws_sns_subscriptions as subs,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
 )
@@ -34,22 +33,10 @@ class IngestionStack(Stack):
         scope: Construct,
         id: str,
         data_bucket: s3.IBucket,
+        notifications_topic: sns.ITopic,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
-
-        # --- SNS Topic for ingestion notifications ---
-
-        self.notifications_topic = sns.Topic(
-            self,
-            "IngestionNotifications",
-            topic_name="bases-loaded-ingestion-notifications",
-        )
-        notification_email = self.node.try_get_context("notification_email")
-        if notification_email:
-            self.notifications_topic.add_subscription(
-                subs.EmailSubscription(notification_email)
-            )
 
         # --- MLB Stats Scraper (Docker Lambda) ---
 
@@ -157,7 +144,7 @@ class IngestionStack(Stack):
         notify_success = tasks.SnsPublish(
             self,
             "NotifySuccess",
-            topic=self.notifications_topic,
+            topic=notifications_topic,
             message=sfn.TaskInput.from_text("Ingestion pipeline completed successfully."),
             subject="Bases Loaded: Ingestion Complete",
         )
@@ -166,7 +153,7 @@ class IngestionStack(Stack):
         notify_failure = tasks.SnsPublish(
             self,
             "NotifyFailure",
-            topic=self.notifications_topic,
+            topic=notifications_topic,
             message=sfn.TaskInput.from_text("Ingestion pipeline failed. Check Step Functions execution logs."),
             subject="Bases Loaded: Ingestion FAILED",
         )

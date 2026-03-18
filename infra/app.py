@@ -29,6 +29,7 @@ IngestionStack(
     app,
     "BasesLoadedIngestion",
     data_bucket=shared.data_bucket,
+    notifications_topic=shared.notifications_topic,
     env=env,
 )
 
@@ -37,6 +38,7 @@ ProcessingStack(
     "BasesLoadedProcessing",
     data_bucket=shared.data_bucket,
     game_day_table=shared.game_day_table,
+    notifications_topic=shared.notifications_topic,
     env=env,
 )
 
@@ -45,6 +47,7 @@ MlStack(
     "BasesLoadedMl",
     models_bucket=shared.models_bucket,
     game_day_table=shared.game_day_table,
+    notifications_topic=shared.notifications_topic,
     env=env,
 )
 
@@ -53,6 +56,7 @@ InferenceStack(
     "BasesLoadedInference",
     models_bucket=shared.models_bucket,
     game_day_table=shared.game_day_table,
+    notifications_topic=shared.notifications_topic,
     env=env,
 )
 

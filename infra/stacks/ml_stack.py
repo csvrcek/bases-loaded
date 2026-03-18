@@ -16,7 +16,6 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_scheduler as scheduler,
     aws_sns as sns,
-    aws_sns_subscriptions as subs,
     Tags,
 )
 from constructs import Construct
@@ -31,24 +30,12 @@ class MlStack(Stack):
         id: str,
         models_bucket: s3.IBucket,
         game_day_table: dynamodb.ITable,
+        notifications_topic: sns.ITopic,
         repo_owner: str = "csvrcek",
         repo_name: str = "bases-loaded",
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
-
-        # --- SNS Topic for pipeline notifications ---
-
-        self.notifications_topic = sns.Topic(
-            self,
-            "MlPipelineNotifications",
-            topic_name="bases-loaded-ml-notifications",
-        )
-        notification_email = self.node.try_get_context("notification_email")
-        if notification_email:
-            self.notifications_topic.add_subscription(
-                subs.EmailSubscription(notification_email)
-            )
 
         # --- IAM Role for EC2 training instance ---
 
@@ -70,7 +57,7 @@ class MlStack(Stack):
         models_bucket.grant_write(training_role)
 
         # Publish training notifications
-        self.notifications_topic.grant_publish(training_role)
+        notifications_topic.grant_publish(training_role)
 
         # Allow self-termination
         training_role.add_to_policy(
@@ -98,7 +85,7 @@ class MlStack(Stack):
             user_data_script.replace("{repo_owner}", repo_owner)
             .replace("{repo_name}", repo_name)
             .replace("{region}", self.region)
-            .replace("{sns_topic_arn}", self.notifications_topic.topic_arn)
+            .replace("{sns_topic_arn}", notifications_topic.topic_arn)
         )
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(user_data_script)

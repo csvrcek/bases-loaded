@@ -1,4 +1,4 @@
-"""Shared infrastructure: S3 buckets, DynamoDB table, and exports for other stacks."""
+"""Shared infrastructure: S3 buckets, DynamoDB table, SNS topic, and exports."""
 
 from aws_cdk import (
     CfnOutput,
@@ -6,6 +6,8 @@ from aws_cdk import (
     Stack,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
+    aws_sns as sns,
+    aws_sns_subscriptions as subs,
 )
 from constructs import Construct
 
@@ -55,8 +57,22 @@ class SharedStack(Stack):
             ),
         )
 
+        # --- SNS Notifications ---
+
+        self.notifications_topic = sns.Topic(
+            self,
+            "NotificationsTopic",
+            topic_name="bases-loaded-notifications",
+        )
+        notification_email = self.node.try_get_context("notification_email")
+        if notification_email:
+            self.notifications_topic.add_subscription(
+                subs.EmailSubscription(notification_email)
+            )
+
         # --- Exports for cross-stack references ---
 
         CfnOutput(self, "DataBucketName", value=self.data_bucket.bucket_name)
         CfnOutput(self, "ModelsBucketName", value=self.models_bucket.bucket_name)
         CfnOutput(self, "GameDayTableName", value=self.game_day_table.table_name)
+        CfnOutput(self, "NotificationsTopicArn", value=self.notifications_topic.topic_arn)
