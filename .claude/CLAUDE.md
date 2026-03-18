@@ -61,6 +61,7 @@ docs/            # Architecture and feature specs
 - All workflows also trigger on `shared/` changes since shared code affects all pillars
 
 ## Conventions
+- **Commits:** Use [Conventional Commits](https://www.conventionalcommits.org/) syntax — `<type>(<optional scope>): <description>` (e.g., `feat(ingestion): add MLB Stats API scraper`)
 - Monorepo: each pillar is a top-level Python package with its own `requirements.txt` and `.venv/`
 - Each module uses a local virtual environment at `<module>/.venv/` — always activate before running commands
 - `shared/` contains cross-cutting AWS helpers (DynamoDB, S3) and central config

@@ -29,7 +29,7 @@ jobs:
         run: pip install -r ml/requirements.txt
 
       - name: Validate imports
-        run: python -c "from ml.config import XGBOOST_PARAMS, ALL_NUMERIC_FEATURES; print(f'{len(ALL_NUMERIC_FEATURES)} features configured')"
+        run: python -c "from ml.config import XGBOOST_PARAM_SETS, ALL_NUMERIC_FEATURES; print(f'{len(ALL_NUMERIC_FEATURES)} features configured')"
 
   deploy:
     needs: test
