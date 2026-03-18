@@ -70,7 +70,7 @@ class ProcessingStack(Stack):
                     ".github",
                 ],
             ),
-            memory_size=3072,  # 3 GB for Polars in-memory processing
+            memory_size=3008,  # ~3 GB for Polars in-memory processing (Lambda max)
             timeout=Duration.minutes(10),
             environment={
                 "S3_BUCKET_DATA": data_bucket.bucket_name,

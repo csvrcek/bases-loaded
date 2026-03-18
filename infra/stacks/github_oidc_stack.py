@@ -106,12 +106,49 @@ class GitHubOidcStack(Stack):
             )
         )
 
-        # Lambda — deploy functions (launcher, inference, etc.)
+        # Lambda — deploy functions
         deploy_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["lambda:*"],
                 resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account}:function:bases-loaded-*",
                     f"arn:aws:lambda:{self.region}:{self.account}:function:BasesLoaded*",
+                ],
+            )
+        )
+
+        # ECR — Docker Lambda container images
+        deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["ecr:*"],
+                resources=[
+                    f"arn:aws:ecr:{self.region}:{self.account}:repository/cdk-*",
+                ],
+            )
+        )
+        deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["ecr:GetAuthorizationToken"],
+                resources=["*"],
+            )
+        )
+
+        # Step Functions — ingestion state machine
+        deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["states:*"],
+                resources=[
+                    f"arn:aws:states:{self.region}:{self.account}:stateMachine:bases-loaded-*",
+                ],
+            )
+        )
+
+        # SNS — pipeline notifications
+        deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["sns:*"],
+                resources=[
+                    f"arn:aws:sns:{self.region}:{self.account}:bases-loaded-*",
                 ],
             )
         )
@@ -122,6 +159,16 @@ class GitHubOidcStack(Stack):
                 actions=["scheduler:*"],
                 resources=[
                     f"arn:aws:scheduler:{self.region}:{self.account}:schedule/*",
+                ],
+            )
+        )
+
+        # EventBridge Rules — processing daily trigger
+        deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["events:*"],
+                resources=[
+                    f"arn:aws:events:{self.region}:{self.account}:rule/*",
                 ],
             )
         )
