@@ -24,14 +24,10 @@ s3 = boto3.client("s3")
 ssm = boto3.client("ssm")
 
 
-def get_api_key() -> str | None:
+def get_api_key() -> str:
     """Fetch OpenWeather API key from SSM Parameter Store."""
-    try:
-        resp = ssm.get_parameter(Name=SSM_PARAM_NAME, WithDecryption=True)
-        return resp["Parameter"]["Value"]
-    except Exception as e:
-        print(f"WARNING: Could not fetch OpenWeather API key from SSM: {e}")
-        return None
+    resp = ssm.get_parameter(Name=SSM_PARAM_NAME, WithDecryption=True)
+    return resp["Parameter"]["Value"]
 
 
 def read_existing(key: str) -> pl.DataFrame | None:
@@ -101,9 +97,6 @@ def handler(event, context):
         return {"status": "no_games", "date": date_str}
 
     api_key = get_api_key()
-    if not api_key:
-        print("WARNING: No OpenWeather API key — skipping weather fetch")
-        return {"status": "no_api_key", "date": date_str}
 
     rows = []
     for g in games:
