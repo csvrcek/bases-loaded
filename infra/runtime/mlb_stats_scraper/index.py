@@ -7,7 +7,7 @@ using the MLB-StatsAPI library. Writes Parquet files to S3.
 import io
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import boto3
 import polars as pl
@@ -251,9 +251,9 @@ def fetch_team_batting(game_id: str, game_date: str, season: int) -> list[dict]:
 
 def handler(event, context):
     """Lambda handler. Expects event with 'date' and/or 'season'."""
-    today = datetime.utcnow().strftime("%m/%d/%Y")
+    today = datetime.now(timezone.utc).strftime("%m/%d/%Y")
     date_str = event.get("date", today)
-    season = int(event.get("season", datetime.utcnow().year))
+    season = int(event.get("season", datetime.now(timezone.utc).year))
 
     print(f"Ingesting MLB Stats data for date={date_str}, season={season}")
 

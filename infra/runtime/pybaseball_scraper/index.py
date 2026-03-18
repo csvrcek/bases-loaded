@@ -6,7 +6,7 @@ from FanGraphs/Baseball-Reference via pybaseball. Writes Parquet to S3.
 
 import io
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 import polars as pl
@@ -194,7 +194,7 @@ def fetch_park_factors() -> pl.DataFrame:
 
 def handler(event, context):
     """Lambda handler. Expects event with 'season'."""
-    season = int(event.get("season", datetime.utcnow().year))
+    season = int(event.get("season", datetime.now(timezone.utc).year))
     print(f"Ingesting PyBaseball data for season={season}")
 
     results = {}

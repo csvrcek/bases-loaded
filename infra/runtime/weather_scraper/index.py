@@ -7,7 +7,7 @@ Domed venues get zeroed-out weather. Appends to season Parquet in S3.
 import io
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 import polars as pl
@@ -82,9 +82,9 @@ def deg_to_compass(deg: float) -> str:
 
 def handler(event, context):
     """Lambda handler. Expects event with 'date' and/or 'season'."""
-    today = datetime.utcnow().strftime("%m/%d/%Y")
+    today = datetime.now(timezone.utc).strftime("%m/%d/%Y")
     date_str = event.get("date", today)
-    season = int(event.get("season", datetime.utcnow().year))
+    season = int(event.get("season", datetime.now(timezone.utc).year))
 
     print(f"Fetching weather for date={date_str}, season={season}")
 
