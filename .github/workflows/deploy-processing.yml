@@ -11,6 +11,8 @@ on:
       - ".github/workflows/deploy-processing.yml"
   workflow_dispatch:
 
+concurrency: cdk-deploy
+
 permissions:
   id-token: write
   contents: read
