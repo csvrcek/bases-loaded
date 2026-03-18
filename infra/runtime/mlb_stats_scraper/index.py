@@ -251,8 +251,8 @@ def fetch_team_batting(game_id: str, game_date: str, season: int) -> list[dict]:
 
 def handler(event, context):
     """Lambda handler. Expects event with 'date' and/or 'season'."""
-    today = datetime.now(timezone.utc).strftime("%m/%d/%Y")
-    date_str = event.get("date", today)
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%m/%d/%Y")
+    date_str = event.get("date", yesterday)
     season = int(event.get("season", datetime.now(timezone.utc).year))
 
     print(f"Ingesting MLB Stats data for date={date_str}, season={season}")

@@ -1,11 +1,8 @@
 """Ingestion stack: Lambda scrapers orchestrated by Step Functions + EventBridge.
 
-Three scrapers run in parallel via a Step Functions Express Workflow:
-  - MLB Stats scraper (Docker Lambda): game logs, pitcher game logs, team batting, schedules
-  - PyBaseball scraper (Docker Lambda): pitcher stats, batting splits, park factors
-  - Weather scraper (Docker Lambda): game-day weather from OpenWeather API
-
-Triggered daily at 8 AM UTC by an EventBridge Scheduler.
+Daily scrapers (MLB Stats + Weather) run in parallel via Step Functions Express
+Workflow at 8 AM UTC. PyBaseball scraper runs weekly (Mondays 7 AM UTC) since
+FanGraphs stats are season-to-date aggregates that change slowly.
 """
 
 import json
@@ -55,7 +52,7 @@ class IngestionStack(Stack):
         )
         data_bucket.grant_read_write(mlb_stats_fn)
 
-        # --- PyBaseball Scraper (Docker Lambda) ---
+        # --- PyBaseball Scraper (Docker Lambda, weekly) ---
 
         pybaseball_fn = _lambda.DockerImageFunction(
             self,
@@ -99,7 +96,7 @@ class IngestionStack(Stack):
             )
         )
 
-        # --- Step Functions: Parallel execution of all 3 scrapers ---
+        # --- Step Functions: Daily ingestion (MLB Stats + Weather) ---
 
         mlb_stats_task = tasks.LambdaInvoke(
             self,
@@ -109,19 +106,6 @@ class IngestionStack(Stack):
             result_path="$.mlbStats",
         )
         mlb_stats_task.add_retry(
-            max_attempts=2,
-            backoff_rate=2,
-            interval=Duration.seconds(30),
-        )
-
-        pybaseball_task = tasks.LambdaInvoke(
-            self,
-            "InvokePyBaseball",
-            lambda_function=pybaseball_fn,
-            retry_on_service_exceptions=True,
-            result_path="$.pyBaseball",
-        )
-        pybaseball_task.add_retry(
             max_attempts=2,
             backoff_rate=2,
             interval=Duration.seconds(30),
@@ -145,8 +129,8 @@ class IngestionStack(Stack):
             self,
             "NotifySuccess",
             topic=notifications_topic,
-            message=sfn.TaskInput.from_text("Ingestion pipeline completed successfully."),
-            subject="Bases Loaded: Ingestion Complete",
+            message=sfn.TaskInput.from_text("Daily ingestion pipeline completed successfully."),
+            subject="Bases Loaded: Daily Ingestion Complete",
         )
 
         # SNS notification on failure (used by Catch)
@@ -154,14 +138,13 @@ class IngestionStack(Stack):
             self,
             "NotifyFailure",
             topic=notifications_topic,
-            message=sfn.TaskInput.from_text("Ingestion pipeline failed. Check Step Functions execution logs."),
-            subject="Bases Loaded: Ingestion FAILED",
+            message=sfn.TaskInput.from_text("Daily ingestion pipeline failed. Check Step Functions execution logs."),
+            subject="Bases Loaded: Daily Ingestion FAILED",
         )
         fail_state = sfn.Fail(self, "IngestionFailed", cause="One or more scrapers failed")
 
-        parallel = sfn.Parallel(self, "RunAllScrapers")
+        parallel = sfn.Parallel(self, "RunDailyScrapers")
         parallel.branch(mlb_stats_task)
-        parallel.branch(pybaseball_task)
         parallel.branch(weather_task)
 
         parallel.add_catch(
@@ -182,13 +165,12 @@ class IngestionStack(Stack):
 
         # --- EventBridge Scheduler: daily at 8 AM UTC ---
 
-        scheduler_role = iam.Role(
+        daily_scheduler_role = iam.Role(
             self,
-            "SchedulerRole",
+            "DailySchedulerRole",
             assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"),
         )
-
-        state_machine.grant_start_sync_execution(scheduler_role)
+        state_machine.grant_start_sync_execution(daily_scheduler_role)
 
         scheduler.CfnSchedule(
             self,
@@ -201,7 +183,32 @@ class IngestionStack(Stack):
             ),
             target=scheduler.CfnSchedule.TargetProperty(
                 arn=state_machine.state_machine_arn,
-                role_arn=scheduler_role.role_arn,
+                role_arn=daily_scheduler_role.role_arn,
+                input=json.dumps({}),
+            ),
+        )
+
+        # --- EventBridge Scheduler: PyBaseball weekly on Mondays at 7 AM UTC ---
+
+        weekly_scheduler_role = iam.Role(
+            self,
+            "WeeklySchedulerRole",
+            assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"),
+        )
+        pybaseball_fn.grant_invoke(weekly_scheduler_role)
+
+        scheduler.CfnSchedule(
+            self,
+            "WeeklyPyBaseballSchedule",
+            schedule_expression="cron(0 7 ? * MON *)",
+            schedule_expression_timezone="UTC",
+            description="Trigger weekly PyBaseball scraper on Mondays at 7 AM UTC (before training)",
+            flexible_time_window=scheduler.CfnSchedule.FlexibleTimeWindowProperty(
+                mode="OFF",
+            ),
+            target=scheduler.CfnSchedule.TargetProperty(
+                arn=pybaseball_fn.function_arn,
+                role_arn=weekly_scheduler_role.role_arn,
                 input=json.dumps({}),
             ),
         )
