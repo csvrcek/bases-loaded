@@ -160,13 +160,21 @@ class IngestionStack(Stack):
             ],
         )
 
-        # MLB Stats runs first (writes game_logs), then Weather reads them
-        definition = (
-            mlb_stats_task
-            .next(weather_task)
+        # Skip weather + processing if MLB Stats found no games
+        no_games_pass = sfn.Succeed(self, "NoGamesFound")
+        check_games = sfn.Choice(self, "GamesFound?")
+        check_games.when(
+            sfn.Condition.string_equals("$.mlbStats.Payload.status", "no_games"),
+            no_games_pass,
+        )
+        check_games.otherwise(
+            weather_task
             .next(notify_success)
             .next(emit_completion)
         )
+
+        # MLB Stats runs first, then branch on whether games were found
+        definition = mlb_stats_task.next(check_games)
         failure_chain = notify_failure.next(fail_state)
         mlb_stats_task.add_catch(
             failure_chain,
