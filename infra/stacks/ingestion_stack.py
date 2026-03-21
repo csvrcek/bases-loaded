@@ -150,12 +150,13 @@ class IngestionStack(Stack):
             .next(weather_task)
             .next(notify_success)
         )
+        failure_chain = notify_failure.next(fail_state)
         mlb_stats_task.add_catch(
-            notify_failure.next(fail_state),
+            failure_chain,
             result_path="$.error",
         )
         weather_task.add_catch(
-            notify_failure.next(fail_state),
+            failure_chain,
             result_path="$.error",
         )
 
