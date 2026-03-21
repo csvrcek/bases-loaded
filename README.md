@@ -45,7 +45,7 @@ No Lambda code changes required — infrastructure only.
 
 ### Historical Backfill (required before first model training)
 
-The model needs 2020–2024 historical game data loaded into S3 and DynamoDB before training can run.
+The model needs 2020–2025 historical game data loaded into S3 and DynamoDB before training can run.
 The plan is to refactor the existing Lambda scrapers to support a backfill mode, then orchestrate them from a local script.
 
 #### Lambda changes
@@ -73,7 +73,7 @@ The plan is to refactor the existing Lambda scrapers to support a backfill mode,
 Thin local orchestrator — invokes the refactored Lambdas via boto3 in sequence, then triggers processing:
 
 ```python
-for season in [2020, 2021, 2022, 2023, 2024]:
+for season in [2020, 2021, 2022, 2023, 2024, 2025]:
     for month in range(1, 13):
         invoke("MlbStatsScraper",  {"mode": "backfill", "season": season, "month": month})
     invoke("PybaseballScraper", {"season": season})
