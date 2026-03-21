@@ -1,8 +1,10 @@
 """Ingestion stack: Lambda scrapers orchestrated by Step Functions + EventBridge.
 
-Daily scrapers (MLB Stats + Weather) run in parallel via Step Functions Express
-Workflow at 8 AM UTC. PyBaseball scraper runs weekly (Mondays 7 AM UTC) since
-FanGraphs stats are season-to-date aggregates that change slowly.
+Daily scrapers (MLB Stats → Weather) run sequentially via Step Functions Express
+Workflow at 8 AM UTC. On success, emits an IngestionCompleted event to
+EventBridge to trigger downstream processing. PyBaseball scraper runs weekly
+(Mondays 7 AM UTC) since FanGraphs stats are season-to-date aggregates that
+change slowly.
 """
 
 import json
@@ -10,6 +12,7 @@ import json
 from aws_cdk import (
     Duration,
     Stack,
+    aws_events as events,
     aws_iam as iam,
     aws_lambda as _lambda,
     aws_s3 as s3,
@@ -144,11 +147,25 @@ class IngestionStack(Stack):
         )
         fail_state = sfn.Fail(self, "IngestionFailed", cause="A scraper failed")
 
+        # Emit custom EventBridge event to trigger downstream processing
+        emit_completion = tasks.EventBridgePutEvents(
+            self,
+            "EmitIngestionCompleted",
+            entries=[
+                tasks.EventBridgePutEventsEntry(
+                    source="bases-loaded.ingestion",
+                    detail_type="IngestionCompleted",
+                    detail=sfn.TaskInput.from_object({"status": "success"}),
+                ),
+            ],
+        )
+
         # MLB Stats runs first (writes game_logs), then Weather reads them
         definition = (
             mlb_stats_task
             .next(weather_task)
             .next(notify_success)
+            .next(emit_completion)
         )
         failure_chain = notify_failure.next(fail_state)
         mlb_stats_task.add_catch(

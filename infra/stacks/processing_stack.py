@@ -1,7 +1,8 @@
 """Processing stack: High-memory Docker Lambda for Polars-based feature engineering.
 
 Reads raw data from S3, computes rolling stats and per-game feature vectors,
-and writes the Game Day State to DynamoDB. Runs daily on an EventBridge schedule.
+and writes the Game Day State to DynamoDB. Triggered by an IngestionCompleted
+event from the ingestion pipeline via EventBridge.
 """
 
 from aws_cdk import (
@@ -56,11 +57,14 @@ class ProcessingStack(Stack):
         game_day_table.grant_read_write_data(processing_fn)
         notifications_topic.grant_publish(processing_fn)
 
-        # --- EventBridge: run daily at 5 AM UTC (midnight EST, after ingestion) ---
+        # --- EventBridge: triggered by ingestion completion ---
 
         events.Rule(
             self,
-            "DailyProcessingSchedule",
-            schedule=events.Schedule.cron(hour="5", minute="0"),
+            "IngestionCompletedTrigger",
+            event_pattern=events.EventPattern(
+                source=["bases-loaded.ingestion"],
+                detail_type=["IngestionCompleted"],
+            ),
             targets=[targets.LambdaFunction(processing_fn)],
         )

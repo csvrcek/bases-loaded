@@ -17,24 +17,6 @@ A fully automated data ingestion and machine learning pipeline to predict Major 
 
 ---
 
-### Event-Driven Ingestion → Processing Trigger
-
-Currently Layer 1 (Ingestion) and Layer 2 (Processing) run on independent time-based schedules (8 AM UTC and 5 AM UTC respectively) with no dependency between them. The goal is for Layer 1's successful completion to directly trigger Layer 2.
-
-**Approach:** The existing Step Functions state machine already ends with an SNS success notification. Add an EventBridge `PutEvents` task as the final step to emit a custom `IngestionCompleted` event. The Processing stack replaces its cron schedule with an EventBridge rule that listens for that event. The stacks stay fully decoupled — ingestion fires an event, processing listens for it.
-
-No Lambda code changes required — infrastructure only.
-
-#### Files to touch
-
-| File | Change |
-| --- | --- |
-| `infra/stacks/ingestion_stack.py` | Add `tasks.EventBridgePutEvents` as the final Step Functions step, emitting `source: "bases-loaded.ingestion"` / `detail-type: "IngestionCompleted"` to the default EventBridge bus on success; grant state machine `events:PutEvents` |
-| `infra/stacks/processing_stack.py` | Replace the `5 AM UTC` cron `events.Rule` with an EventBridge rule matching `source: ["bases-loaded.ingestion"]` / `detail-type: ["IngestionCompleted"]` that targets the processing Lambda |
-| `infra/app.py` | No changes — stacks remain fully decoupled |
-
----
-
 ## Historical Backfill (required before first model training)
 
 The model needs 2020–2025 historical game data loaded into S3 and DynamoDB before training can run.
