@@ -25,6 +25,24 @@ A fully automated data ingestion and machine learning pipeline to predict Major 
 
 ---
 
+### Relocate Scraper Code to `ingestion/`
+
+The scraper Lambda code currently lives under `infra/runtime/` alongside the Docker build context, but the `ingestion/` top-level package is empty. For consistency with the other pillars (`processing/`, `ml/`), the business logic should live in `ingestion/` and `infra/runtime/` should only contain the Dockerfiles and entrypoints that import from it.
+
+#### Ingestion files to touch
+
+| Action | Detail |
+| --- | --- |
+| Move `infra/runtime/mlb_stats_scraper/index.py` → `ingestion/mlb_stats_scraper.py` | Core scraping logic |
+| Move `infra/runtime/pybaseball_scraper/index.py` → `ingestion/pybaseball_scraper.py` | Core scraping logic |
+| Move `infra/runtime/weather_scraper/index.py` → `ingestion/weather_scraper.py` | Core scraping logic |
+| Move `infra/runtime/weather_scraper/venues.py` → `ingestion/venues.py` | Venue metadata |
+| Update `infra/runtime/*/Dockerfile` | Install `ingestion/` package and import from it instead of defining logic inline |
+| Update `infra/stacks/ingestion_stack.py` | Adjust Docker build context paths if needed |
+| Add `ingestion/requirements.txt` and `ingestion/.venv/` | Match the per-pillar venv convention |
+
+---
+
 ### Event-Driven Ingestion → Processing Trigger
 
 Currently Layer 1 (Ingestion) and Layer 2 (Processing) run on independent time-based schedules (8 AM UTC and 5 AM UTC respectively) with no dependency between them. The goal is for Layer 1's successful completion to directly trigger Layer 2.
