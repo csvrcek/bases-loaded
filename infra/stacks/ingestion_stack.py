@@ -6,7 +6,6 @@ FanGraphs stats are season-to-date aggregates that change slowly.
 """
 
 import json
-from pathlib import Path
 
 from aws_cdk import (
     Duration,
@@ -21,7 +20,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-INGESTION_DIR = Path(__file__).resolve().parent.parent.parent / "ingestion"
+from infra.stacks import EXCLUDE_DIRS, REPO_ROOT
 
 
 class IngestionStack(Stack):
@@ -42,9 +41,11 @@ class IngestionStack(Stack):
             "MlbStatsScraper",
             function_name="bases-loaded-mlb-stats-scraper",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory=str(INGESTION_DIR),
+                directory=str(REPO_ROOT),
+                file="ingestion/Dockerfile",
                 build_args={"SCRAPER": "mlb_stats_scraper"},
                 cmd=["ingestion.mlb_stats_scraper.handler.handler"],
+                exclude=[d for d in EXCLUDE_DIRS if d != "ingestion"],
             ),
             memory_size=512,
             timeout=Duration.minutes(5),
@@ -61,9 +62,11 @@ class IngestionStack(Stack):
             "PyBaseballScraper",
             function_name="bases-loaded-pybaseball-scraper",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory=str(INGESTION_DIR),
+                directory=str(REPO_ROOT),
+                file="ingestion/Dockerfile",
                 build_args={"SCRAPER": "pybaseball_scraper"},
                 cmd=["ingestion.pybaseball_scraper.handler.handler"],
+                exclude=[d for d in EXCLUDE_DIRS if d != "ingestion"],
             ),
             memory_size=1024,
             timeout=Duration.minutes(10),
@@ -80,9 +83,11 @@ class IngestionStack(Stack):
             "WeatherScraper",
             function_name="bases-loaded-weather-scraper",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory=str(INGESTION_DIR),
+                directory=str(REPO_ROOT),
+                file="ingestion/Dockerfile",
                 build_args={"SCRAPER": "weather_scraper"},
                 cmd=["ingestion.weather_scraper.handler.handler"],
+                exclude=[d for d in EXCLUDE_DIRS if d != "ingestion"],
             ),
             memory_size=256,
             timeout=Duration.minutes(2),

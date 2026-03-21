@@ -4,8 +4,6 @@ Reads raw data from S3, computes rolling stats and per-game feature vectors,
 and writes the Game Day State to DynamoDB. Runs daily on an EventBridge schedule.
 """
 
-from pathlib import Path
-
 from aws_cdk import (
     Duration,
     Stack,
@@ -18,7 +16,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+from infra.stacks import EXCLUDE_DIRS, REPO_ROOT
 
 
 class ProcessingStack(Stack):
@@ -42,20 +40,7 @@ class ProcessingStack(Stack):
             code=_lambda.DockerImageCode.from_image_asset(
                 directory=str(REPO_ROOT),
                 file="processing/Dockerfile",
-                exclude=[
-                    ".git",
-                    "*.pyc",
-                    "__pycache__",
-                    ".venv",
-                    "cdk.out",
-                    "node_modules",
-                    "infra",
-                    "ml",
-                    "ingestion",
-                    "inference",
-                    "docs",
-                    ".github",
-                ],
+                exclude=[d for d in EXCLUDE_DIRS if d != "processing"],
             ),
             memory_size=3008,  # ~3 GB for Polars in-memory processing (Lambda max)
             timeout=Duration.minutes(10),
