@@ -17,18 +17,18 @@ A fully automated data ingestion and machine learning pipeline to predict Major 
 
 ---
 
-## Historical Backfill (required before first model training)
+### Historical Backfill Execution (required before first model training)
 
 The model needs 2020–2025 historical game data loaded into S3 and DynamoDB before training can run.
 `scripts/backfill.py` orchestrates the deployed Lambda scrapers to load all historical data.
 
-### Prerequisites
+#### Prerequisites
 
 1. Ingestion stack deployed: `cd infra && cdk deploy BasesLoadedIngestion`
 2. AWS credentials configured with permission to invoke the Lambda functions
 3. `boto3` installed locally: `pip install boto3`
 
-### Running the backfill
+#### Running the backfill
 
 ```bash
 # All seasons (2020–2025)
@@ -47,7 +47,7 @@ For each season the script invokes three Lambdas in sequence:
 2. **PyBaseball scraper** — fetches season-to-date pitching stats, batting splits, and park factors
 3. **Weather scraper** (backfill mode) — reads game_logs from S3 for venue mappings, fetches historical observations via Meteostat
 
-### Verifying the backfill
+#### Verifying the backfill
 
 Check that Parquet files were written to S3 for each season:
 
