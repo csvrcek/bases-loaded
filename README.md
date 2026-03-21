@@ -2,14 +2,6 @@
 
 A fully automated data ingestion and machine learning pipeline to predict Major Leaguge Baseball (MLB) game outcomes.
 
-## TODO
-
-- [ ] Event driven
-  - [x] Layer 1 should trigger layer 2 — see plan below
-  - [ ] Can layer 1 be triggered by an event as well?
-
----
-
 ## Remaining Work
 
 ### Pillar 4 — Inference & Delivery
