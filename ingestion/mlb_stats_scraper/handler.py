@@ -91,18 +91,6 @@ def merge_and_deduplicate(
     return combined.unique(subset=[dedup_col], keep="last")
 
 
-def fetch_schedule(season: int, date: str | None = None) -> list[dict]:
-    """Fetch MLB schedule. If date given, fetch that date only; else full season."""
-    if date:
-        sched = statsapi.schedule(start_date=date, end_date=date)
-    else:
-        sched = statsapi.schedule(
-            start_date=f"01/01/{season}",
-            end_date=f"12/31/{season}",
-        )
-    return sched
-
-
 def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
     """Build game_logs DataFrame from statsapi schedule data."""
     rows = []
@@ -250,20 +238,31 @@ def fetch_team_batting(game_id: str, game_date: str, season: int) -> list[dict]:
 
 
 def handler(event, context):
-    """Lambda handler. Expects event with 'date' and/or 'season'."""
+    """Lambda handler.
+
+    Accepts optional 'start_date' and 'end_date' (MM/DD/YYYY format).
+    If omitted, defaults to yesterday (daily BAU mode).
+    Both dates must be within the same year. Season is derived from the year.
+    """
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%m/%d/%Y")
-    date_str = event.get("date", yesterday)
-    season = int(event.get("season", datetime.now(timezone.utc).year))
+    start_date = event.get("start_date", yesterday)
+    end_date = event.get("end_date", start_date)
 
-    print(f"Ingesting MLB Stats data for date={date_str}, season={season}")
+    start_year = int(start_date.split("/")[2])
+    end_year = int(end_date.split("/")[2])
+    if start_year != end_year:
+        raise ValueError(f"start_date and end_date must be in the same year, got {start_year} and {end_year}")
 
-    # Fetch schedule for the date
-    games = fetch_schedule(season, date=date_str)
-    print(f"Found {len(games)} games for {date_str}")
+    season = start_year
+
+    print(f"Ingesting MLB Stats data for start_date={start_date}, end_date={end_date}, season={season}")
+
+    games = statsapi.schedule(start_date=start_date, end_date=end_date)
+    print(f"Found {len(games)} games for {start_date} to {end_date}")
 
     if not games:
         print("No games found, exiting")
-        return {"status": "no_games", "date": date_str}
+        return {"status": "no_games", "start_date": start_date, "end_date": end_date}
 
     # --- Game Logs ---
     game_logs_key = f"{S3_PREFIX}/game_logs/{season}/game_logs.parquet"
@@ -323,7 +322,8 @@ def handler(event, context):
 
     return {
         "status": "success",
-        "date": date_str,
+        "start_date": start_date,
+        "end_date": end_date,
         "season": season,
         "games_found": len(games),
         "games_completed": len(completed_games),

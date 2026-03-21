@@ -35,50 +35,53 @@ No Lambda code changes required — infrastructure only.
 
 ---
 
-### Historical Backfill (required before first model training)
+## Historical Backfill (required before first model training)
 
 The model needs 2020–2025 historical game data loaded into S3 and DynamoDB before training can run.
-The plan is to refactor the existing Lambda scrapers to support a backfill mode, then orchestrate them from a local script.
+`scripts/backfill.py` orchestrates the deployed Lambda scrapers to load all historical data.
 
-#### Lambda changes
+### Prerequisites
 
-**`ingestion/mlb_stats_scraper/handler.py`**
+1. Ingestion stack deployed: `cd infra && cdk deploy BasesLoadedIngestion`
+2. AWS credentials configured with permission to invoke the Lambda functions
+3. `boto3` installed locally: `pip install boto3`
 
-- Add `mode: "backfill"` to the handler
-- When backfill: accept `season` + `month` params, call `fetch_schedule(season, date=None)` (path already exists) and process all completed games for that month
-- Chunking by month keeps each invocation under the 15-min Lambda timeout (~200 games vs ~2430 for a full season)
-- Increase Lambda timeout from 5 min → 15 min in CDK (`infra/stacks/ingestion_stack.py`)
+### Running the backfill
 
-**`ingestion/pybaseball_scraper/handler.py`**
+```bash
+# All seasons (2020–2025)
+python scripts/backfill.py
 
-- No changes needed — already fetches by season, just invoke with `{"season": YYYY}`
+# Specific seasons
+python scripts/backfill.py --seasons 2024 2025
 
-**`ingestion/weather_scraper/handler.py`**
-
-- Add `mode: "backfill"` to the handler — OpenWeather only provides forecasts so historical data needs a different source
-- In backfill mode: read the season's `game_logs.parquet` from S3 to get `game_id → venue` mappings, then use **Meteostat** for historical observations
-- Domed stadiums stay the same (zeroed out)
-- Add `meteostat` to the weather scraper's `requirements.txt` and Docker image
-
-#### New file: `scripts/backfill.py`
-
-Thin local orchestrator — invokes the refactored Lambdas via boto3 in sequence, then triggers processing:
-
-```python
-for season in [2020, 2021, 2022, 2023, 2024, 2025]:
-    for month in range(1, 13):
-        invoke("MlbStatsScraper",  {"mode": "backfill", "season": season, "month": month})
-    invoke("PybaseballScraper", {"season": season})
-    invoke("WeatherScraper",    {"mode": "backfill", "season": season})
-    invoke("ProcessingLambda",  {"mode": "backfill", "season": season})
+# Single season
+python scripts/backfill.py --seasons 2025
 ```
 
-#### Backfill files to touch
+For each season the script invokes three Lambdas in sequence:
 
-| File | Change |
-| --- | --- |
-| `ingestion/mlb_stats_scraper/handler.py` | Add `mode: "backfill"` with month-chunked season fetch |
-| `ingestion/weather_scraper/handler.py` | Add `mode: "backfill"` using Meteostat |
-| `ingestion/weather_scraper/requirements.txt` | Add `meteostat` |
-| `infra/stacks/ingestion_stack.py` | Bump MLB Stats Lambda timeout to 15 min |
-| `scripts/backfill.py` | New — boto3 orchestrator script |
+1. **MLB Stats scraper** — fetches the full season schedule + boxscores via `start_date`/`end_date`
+2. **PyBaseball scraper** — fetches season-to-date pitching stats, batting splits, and park factors
+3. **Weather scraper** (backfill mode) — reads game_logs from S3 for venue mappings, fetches historical observations via Meteostat
+
+### Verifying the backfill
+
+Check that Parquet files were written to S3 for each season:
+
+```bash
+# List all raw data files
+aws s3 ls s3://bases-loaded-data/raw/ --recursive --human-readable
+
+# Spot-check a specific season
+aws s3 ls s3://bases-loaded-data/raw/game_logs/2024/
+aws s3 ls s3://bases-loaded-data/raw/pitcher_game_logs/2024/
+aws s3 ls s3://bases-loaded-data/raw/team_batting/2024/
+aws s3 ls s3://bases-loaded-data/raw/schedules/2024/
+aws s3 ls s3://bases-loaded-data/raw/weather/2024/
+aws s3 ls s3://bases-loaded-data/raw/pitcher_stats/2024/
+aws s3 ls s3://bases-loaded-data/raw/team_batting_splits/2024/
+aws s3 ls s3://bases-loaded-data/raw/park_factors/
+```
+
+Expected files per season: `game_logs.parquet`, `pitcher_game_logs.parquet`, `team_batting.parquet`, `schedules.parquet`, `weather.parquet`, `pitcher_stats.parquet`, `team_batting_splits.parquet`. Park factors are season-independent (single file).

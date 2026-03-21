@@ -48,7 +48,7 @@ class IngestionStack(Stack):
                 exclude=[d for d in EXCLUDE_DIRS if d != "ingestion"],
             ),
             memory_size=512,
-            timeout=Duration.minutes(5),
+            timeout=Duration.minutes(15),
             environment={
                 "S3_BUCKET_DATA": data_bucket.bucket_name,
             },
@@ -97,17 +97,7 @@ class IngestionStack(Stack):
         )
         data_bucket.grant_read_write(weather_fn)
 
-        # SSM read permission for OpenWeather API key
-        weather_fn.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["ssm:GetParameter"],
-                resources=[
-                    f"arn:aws:ssm:{self.region}:{self.account}:parameter/bases-loaded/openweather-api-key",
-                ],
-            )
-        )
-
-        # --- Step Functions: Daily ingestion (MLB Stats + Weather) ---
+        # --- Step Functions: Daily ingestion (MLB Stats → Weather, sequential) ---
 
         mlb_stats_task = tasks.LambdaInvoke(
             self,
@@ -152,18 +142,22 @@ class IngestionStack(Stack):
             message=sfn.TaskInput.from_text("Daily ingestion pipeline failed. Check Step Functions execution logs."),
             subject="Bases Loaded: Daily Ingestion FAILED",
         )
-        fail_state = sfn.Fail(self, "IngestionFailed", cause="One or more scrapers failed")
+        fail_state = sfn.Fail(self, "IngestionFailed", cause="A scraper failed")
 
-        parallel = sfn.Parallel(self, "RunDailyScrapers")
-        parallel.branch(mlb_stats_task)
-        parallel.branch(weather_task)
-
-        parallel.add_catch(
+        # MLB Stats runs first (writes game_logs), then Weather reads them
+        definition = (
+            mlb_stats_task
+            .next(weather_task)
+            .next(notify_success)
+        )
+        mlb_stats_task.add_catch(
             notify_failure.next(fail_state),
             result_path="$.error",
         )
-
-        definition = parallel.next(notify_success)
+        weather_task.add_catch(
+            notify_failure.next(fail_state),
+            result_path="$.error",
+        )
 
         state_machine = sfn.StateMachine(
             self,

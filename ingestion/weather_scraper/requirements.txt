@@ -1,4 +1,3 @@
-requests
-MLB-StatsAPI
 polars
 boto3
+meteostat
