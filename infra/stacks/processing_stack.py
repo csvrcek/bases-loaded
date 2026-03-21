@@ -16,7 +16,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-from infra.stacks import EXCLUDE_DIRS, REPO_ROOT
+from stacks import EXCLUDE_DIRS, REPO_ROOT
 
 
 class ProcessingStack(Stack):
