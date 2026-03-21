@@ -1,5 +1,0 @@
-MLB-StatsAPI
-pybaseball
-polars
-boto3
-requests
