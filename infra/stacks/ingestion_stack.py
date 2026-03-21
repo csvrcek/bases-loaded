@@ -22,6 +22,7 @@ from aws_cdk import (
 from constructs import Construct
 
 RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class IngestionStack(Stack):
@@ -42,7 +43,8 @@ class IngestionStack(Stack):
             "MlbStatsScraper",
             function_name="bases-loaded-mlb-stats-scraper",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory=str(RUNTIME_DIR / "mlb_stats_scraper"),
+                directory=str(REPO_ROOT),
+                file="infra/runtime/mlb_stats_scraper/Dockerfile",
             ),
             memory_size=512,
             timeout=Duration.minutes(5),
@@ -59,7 +61,8 @@ class IngestionStack(Stack):
             "PyBaseballScraper",
             function_name="bases-loaded-pybaseball-scraper",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory=str(RUNTIME_DIR / "pybaseball_scraper"),
+                directory=str(REPO_ROOT),
+                file="infra/runtime/pybaseball_scraper/Dockerfile",
             ),
             memory_size=1024,
             timeout=Duration.minutes(10),
@@ -76,7 +79,8 @@ class IngestionStack(Stack):
             "WeatherScraper",
             function_name="bases-loaded-weather-scraper",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory=str(RUNTIME_DIR / "weather_scraper"),
+                directory=str(REPO_ROOT),
+                file="infra/runtime/weather_scraper/Dockerfile",
             ),
             memory_size=256,
             timeout=Duration.minutes(2),
