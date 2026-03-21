@@ -75,6 +75,7 @@ class IngestionStack(Stack):
             timeout=Duration.minutes(10),
             environment={
                 "S3_BUCKET_DATA": data_bucket.bucket_name,
+                "HOME": "/tmp",
             },
         )
         data_bucket.grant_read_write(pybaseball_fn)

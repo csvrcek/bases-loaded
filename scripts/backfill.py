@@ -15,9 +15,14 @@ import sys
 import time
 
 import boto3
+from botocore.config import Config
 
 REGION = "us-east-2"
-LAMBDA_CLIENT = boto3.client("lambda", region_name=REGION)
+LAMBDA_CLIENT = boto3.client(
+    "lambda",
+    region_name=REGION,
+    config=Config(read_timeout=900),
+)
 
 MLB_STATS_FN = "bases-loaded-mlb-stats-scraper"
 PYBASEBALL_FN = "bases-loaded-pybaseball-scraper"
@@ -50,12 +55,18 @@ def backfill_season(season: int) -> None:
     print(f"Backfilling season {season}")
     print(f"{'='*60}")
 
-    # 1. MLB Stats — full season in one call
+    # 1. MLB Stats — chunk by week to stay within Lambda timeout
     print(f"\n[1/3] MLB Stats scraper ({season})")
-    invoke(MLB_STATS_FN, {
-        "start_date": f"01/01/{season}",
-        "end_date": f"12/31/{season}",
-    })
+    from datetime import date, timedelta
+    start = date(season, 1, 1)
+    end = date(season, 12, 31)
+    while start <= end:
+        chunk_end = min(start + timedelta(days=6), end)
+        invoke(MLB_STATS_FN, {
+            "start_date": start.strftime("%m/%d/%Y"),
+            "end_date": chunk_end.strftime("%m/%d/%Y"),
+        })
+        start = chunk_end + timedelta(days=1)
 
     # 2. PyBaseball — already supports season param
     print(f"\n[2/3] PyBaseball scraper ({season})")
