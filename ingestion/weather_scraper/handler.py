@@ -16,6 +16,9 @@ import boto3
 import polars as pl
 from meteostat import Daily, Point
 
+# Lambda filesystem is read-only except /tmp — redirect Meteostat cache
+Daily.cache_dir = "/tmp/.meteostat"
+
 from ingestion.venues import VENUES
 
 S3_BUCKET = os.environ["S3_BUCKET_DATA"]

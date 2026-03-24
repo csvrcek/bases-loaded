@@ -22,6 +22,8 @@ A fully automated data ingestion and machine learning pipeline to predict Major 
 The model needs 2020–2025 historical game data loaded into S3 and DynamoDB before training can run.
 `scripts/backfill.py` orchestrates the deployed Lambda scrapers to load all historical data.
 
+- [ ] **Unknown venues in `ingestion/venues.py`** — weather scraper skips games at venues not in the mapping (Daikin Park, Rate Field, Sutter Health Park, plus spring training sites like TD Ballpark, Sloan Park, etc.). Add missing regular-season venues and filter out spring training games.
+
 #### Prerequisites
 
 1. Ingestion stack deployed: `cd infra && cdk deploy BasesLoadedIngestion`
