@@ -15,9 +15,11 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import polars as pl
 from meteostat import Daily, Point
+from meteostat.interface.base import Base
 
 # Lambda filesystem is read-only except /tmp — redirect Meteostat cache
-Daily.cache_dir = "/tmp/.meteostat"
+# Must set on Base so all subclasses (Daily, Stations, etc.) inherit it
+Base.cache_dir = "/tmp/.meteostat"
 
 from ingestion.venues import VENUES
 
