@@ -67,12 +67,22 @@ def fetch_weather(lat: float, lon: float, game_date: str) -> dict:
         return {"temp_f": 0.0, "wind_mph": 0.0, "wind_dir": "None"}
 
     row = data.iloc[0]
-    # Meteostat returns temp in Celsius, wind in km/h, direction in degrees
-    temp_c = row.get("tavg", row.get("tmax", 0)) or 0
+    # Meteostat returns pandas — NA values raise on bool coercion (e.g. `or 0`).
+    # Convert to Python dict so NaN becomes float('nan'), then use math.isnan.
+    import math
+    vals = row.to_dict()
+
+    def safe(val, default=0):
+        try:
+            return default if val is None or math.isnan(val) else val
+        except TypeError:
+            return default
+
+    temp_c = safe(vals.get("tavg"), safe(vals.get("tmax")))
     temp_f = round(temp_c * 9 / 5 + 32, 1)
-    wind_kmh = row.get("wspd", 0) or 0
+    wind_kmh = safe(vals.get("wspd"))
     wind_mph = round(wind_kmh * 0.621371, 1)
-    wind_deg = row.get("wdir", 0) or 0
+    wind_deg = safe(vals.get("wdir"))
 
     return {
         "temp_f": temp_f,
