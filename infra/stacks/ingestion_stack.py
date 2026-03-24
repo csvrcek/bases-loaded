@@ -94,7 +94,7 @@ class IngestionStack(Stack):
                 exclude=[d for d in EXCLUDE_DIRS if d != "ingestion"],
             ),
             memory_size=256,
-            timeout=Duration.minutes(2),
+            timeout=Duration.minutes(15),
             environment={
                 "S3_BUCKET_DATA": data_bucket.bucket_name,
             },
