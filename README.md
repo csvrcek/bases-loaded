@@ -22,6 +22,8 @@ A fully automated data ingestion and machine learning pipeline to predict Major 
 The model needs 2020–2025 historical game data loaded into S3 and DynamoDB before training can run.
 `scripts/backfill.py` orchestrates the deployed Lambda scrapers to load all historical data.
 
+- [ ] **Re-run backfill for 2021–2025** — game_logs need `venue_id` column and spring training filtering. 2020 is done. Run: `python3 scripts/backfill.py --seasons 2021 2022 2023 2024 2025`
+
 #### Prerequisites
 
 1. Ingestion stack deployed: `cd infra && cdk deploy BasesLoadedIngestion`
