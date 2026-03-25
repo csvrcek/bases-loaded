@@ -91,10 +91,15 @@ def merge_and_deduplicate(
     return combined.unique(subset=[dedup_col], keep="last")
 
 
+REGULAR_GAME_TYPES = {"R", "F", "D", "L", "W"}  # Regular season + postseason
+
+
 def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
     """Build game_logs DataFrame from statsapi schedule data."""
     rows = []
     for g in games:
+        if g.get("game_type", "") not in REGULAR_GAME_TYPES:
+            continue
         # Only include completed games
         if g.get("status", "") != "Final":
             continue
@@ -108,6 +113,7 @@ def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
                 "home_score": g.get("home_score", 0),
                 "away_score": g.get("away_score", 0),
                 "venue_name": g.get("venue_name", ""),
+                "venue_id": str(g.get("venue_id", "")),
                 "home_sp_id": str(g.get("home_probable_pitcher", "")),
                 "away_sp_id": str(g.get("away_probable_pitcher", "")),
                 "status": g.get("status", ""),
@@ -124,6 +130,7 @@ def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
                 "home_score": pl.Int64,
                 "away_score": pl.Int64,
                 "venue_name": pl.Utf8,
+                "venue_id": pl.Utf8,
                 "home_sp_id": pl.Utf8,
                 "away_sp_id": pl.Utf8,
                 "status": pl.Utf8,
@@ -135,7 +142,7 @@ def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
 def build_schedules(games: list[dict], season: int) -> pl.DataFrame:
     """Build schedules DataFrame — one row per team per game date."""
     rows = []
-    for g in games:
+    for g in (g for g in games if g.get("game_type", "") in REGULAR_GAME_TYPES):
         venue = g.get("venue_name", "")
         game_date = g["game_date"]
         home_team = get_team_abbrev(g.get("home_name", ""))
@@ -285,7 +292,10 @@ def handler(event, context):
         write_parquet(schedules_df, schedules_key)
 
     # --- Pitcher Game Logs & Team Batting (from boxscores) ---
-    completed_games = [g for g in games if g.get("status") == "Final"]
+    completed_games = [
+        g for g in games
+        if g.get("status") == "Final" and g.get("game_type", "") in REGULAR_GAME_TYPES
+    ]
     all_pitcher_rows = []
     all_batting_rows = []
 

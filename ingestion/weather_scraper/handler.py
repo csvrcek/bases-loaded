@@ -6,11 +6,15 @@ game_logs from S3 to discover games and their venues.
 Daily (empty event): reads current season's game_logs, filters to yesterday.
 Backfill (event with 'season'): reads the full season's game_logs.
 Domed venues always get zeroed-out weather.
+Venue coordinates are fetched from the MLB Stats API (cached per invocation).
 """
 
 import io
+import json
+import math
 import os
 from datetime import datetime, timedelta, timezone
+from urllib.request import urlopen
 
 import boto3
 import polars as pl
@@ -21,12 +25,46 @@ from meteostat.interface.base import Base
 # Must set on Base so all subclasses (Daily, Stations, etc.) inherit it
 Base.cache_dir = "/tmp/.meteostat"
 
-from ingestion.venues import VENUES
-
 S3_BUCKET = os.environ["S3_BUCKET_DATA"]
 S3_PREFIX = "raw"
 
 s3 = boto3.client("s3")
+
+# Venues with dome or retractable roof — weather is irrelevant, zero out.
+# Keyed by venue_id (str). This list changes rarely (new stadiums ~once a decade).
+DOMED_VENUE_IDS = {
+    "15",    # Chase Field (retractable)
+    "2392",  # Daikin Park / formerly Minute Maid Park (retractable)
+    "4169",  # loanDepot park (retractable)
+    "32",    # American Family Field (retractable)
+    "14",    # Rogers Centre (retractable)
+    "12",    # Tropicana Field (dome)
+    "5325",  # Globe Life Field (retractable)
+    "680",   # T-Mobile Park (retractable)
+}
+
+# In-memory cache for venue coordinates fetched from MLB Stats API
+_venue_cache: dict[str, dict] = {}
+
+
+def fetch_venue_coords(venue_id: str) -> dict | None:
+    """Fetch venue lat/lon from the MLB Stats API. Cached per invocation."""
+    if venue_id in _venue_cache:
+        return _venue_cache[venue_id]
+
+    try:
+        url = f"https://statsapi.mlb.com/api/v1/venues/{venue_id}?hydrate=location"
+        with urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read())
+        venue = data["venues"][0]
+        coords = venue["location"]["defaultCoordinates"]
+        result = {"lat": coords["latitude"], "lon": coords["longitude"]}
+        _venue_cache[venue_id] = result
+        return result
+    except Exception as e:
+        print(f"WARNING: Could not fetch coordinates for venue {venue_id}: {e}")
+        _venue_cache[venue_id] = None
+        return None
 
 
 def read_existing(key: str) -> pl.DataFrame | None:
@@ -69,7 +107,6 @@ def fetch_weather(lat: float, lon: float, game_date: str) -> dict:
     row = data.iloc[0]
     # Meteostat returns pandas — NA values raise on bool coercion (e.g. `or 0`).
     # Convert to Python dict so NaN becomes float('nan'), then use math.isnan.
-    import math
     vals = row.to_dict()
 
     def safe(val, default=0):
@@ -131,32 +168,36 @@ def handler(event, context):
     for game in game_logs.iter_rows(named=True):
         game_id = game["game_id"]
         venue_name = game.get("venue_name", "")
+        venue_id = str(game.get("venue_id", "") or "")
         game_date = game.get("game_date", "")
-        venue = VENUES.get(venue_name)
 
-        if venue is None:
-            print(f"WARNING: Unknown venue '{venue_name}' for game {game_id}, skipping")
-            continue
-
-        if venue["roof"] == "dome":
+        # Domed/retractable venues — zero out weather
+        if venue_id in DOMED_VENUE_IDS:
             rows.append({
                 "game_id": game_id,
                 "temp_f": 0.0,
                 "wind_mph": 0.0,
                 "wind_dir": "None",
             })
-        else:
-            try:
-                weather = fetch_weather(venue["lat"], venue["lon"], game_date)
-                rows.append({
-                    "game_id": game_id,
-                    "temp_f": weather["temp_f"],
-                    "wind_mph": weather["wind_mph"],
-                    "wind_dir": weather["wind_dir"],
-                })
-            except Exception as e:
-                print(f"WARNING: Weather fetch failed for {venue_name} game {game_id} ({game_date}): {e}")
-                continue
+            continue
+
+        # Fetch venue coordinates from MLB Stats API
+        coords = fetch_venue_coords(venue_id) if venue_id else None
+        if coords is None:
+            print(f"WARNING: No coordinates for venue '{venue_name}' (id={venue_id}), game {game_id}, skipping")
+            continue
+
+        try:
+            weather = fetch_weather(coords["lat"], coords["lon"], game_date)
+            rows.append({
+                "game_id": game_id,
+                "temp_f": weather["temp_f"],
+                "wind_mph": weather["wind_mph"],
+                "wind_dir": weather["wind_dir"],
+            })
+        except Exception as e:
+            print(f"WARNING: Weather fetch failed for {venue_name} game {game_id} ({game_date}): {e}")
+            continue
 
     if not rows:
         print("No weather data collected")
