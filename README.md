@@ -13,4 +13,4 @@ A fully automated data ingestion and machine learning pipeline to predict Major 
   1. Open the [SSM Parameter Store console](https://us-east-2.console.aws.amazon.com/systems-manager/parameters?region=us-east-2)
   2. Create parameter `/bases-loaded/ses-sender` (String) → set value to the verified sender email from step above
   3. Create parameter `/bases-loaded/subscribers` (String) → set value to a comma-separated list of recipient emails (e.g. `alice@example.com,bob@example.com`)
-- [ ] **Subscriber management** — build a self-service way for new users to subscribe to the prediction email list (e.g. a simple web form backed by API Gateway + Lambda that appends to the SSM subscriber list)
+- [ ] **Subscriber management** — build a self-service way for new users to subscribe to the prediction email list (e.g. a simple web form backed by API Gateway + Lambda that appends to the SSM subscriber list). Request SES production access before launch so unverified recipients can receive emails.
