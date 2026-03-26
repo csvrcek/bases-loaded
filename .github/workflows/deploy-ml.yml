@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: cdk-deploy
+  group: cdk-deploy-ml
   cancel-in-progress: false
 
 permissions:

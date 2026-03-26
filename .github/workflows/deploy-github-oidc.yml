@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: cdk-deploy
+  group: cdk-deploy-github-oidc
   cancel-in-progress: false
 
 permissions:
