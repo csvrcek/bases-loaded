@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bases Loaded — {{ date }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;">
+<tr><td align="center" style="padding:24px 16px;">
+
+  <!-- Outer container -->
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+
+    <!-- Header -->
+    <tr>
+      <td style="background:#1a3a5c;padding:24px 32px;text-align:center;">
+        <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Bases Loaded</h1>
+        <p style="margin:8px 0 0;color:#a8c4e0;font-size:14px;">Predictions for {{ date }}</p>
+      </td>
+    </tr>
+
+    <!-- Games -->
+    {% for game in games %}
+    <tr>
+      <td style="padding:24px 32px;{% if not loop.last %}border-bottom:1px solid #e8e8e8;{% endif %}">
+
+        <!-- Matchup header -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="font-size:18px;font-weight:700;color:#1a3a5c;">
+              {{ game.away_team }} <span style="color:#999;font-weight:400;">@</span> {{ game.home_team }}
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#777;padding-top:4px;">
+              {{ game.game_time }} &middot; {{ game.venue_name }}
+            </td>
+          </tr>
+          {% if game.away_pitcher or game.home_pitcher %}
+          <tr>
+            <td style="font-size:13px;color:#999;padding-top:2px;">
+              {{ game.away_pitcher or "TBD" }} vs {{ game.home_pitcher or "TBD" }}
+            </td>
+          </tr>
+          {% endif %}
+        </table>
+
+        <!-- Predictions -->
+        {% for pred in game.predictions %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+          <tr>
+            <td style="font-size:12px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.5px;padding-bottom:6px;">
+              {{ pred.label }}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <!-- Away side -->
+                  <td style="font-size:14px;font-weight:700;color:#1a3a5c;width:60px;">
+                    {{ pred.away_value }}
+                  </td>
+                  <!-- Bar -->
+                  <td style="padding:0 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:4px;overflow:hidden;">
+                      <tr>
+                        <td style="background:{% if pred.away_pct >= pred.home_pct %}#2e7d32{% else %}#90a4ae{% endif %};height:8px;width:{{ pred.away_pct }}%;"></td>
+                        <td style="background:{% if pred.home_pct > pred.away_pct %}#2e7d32{% else %}#90a4ae{% endif %};height:8px;width:{{ pred.home_pct }}%;"></td>
+                      </tr>
+                    </table>
+                  </td>
+                  <!-- Home side -->
+                  <td style="font-size:14px;font-weight:700;color:#1a3a5c;width:60px;text-align:right;">
+                    {{ pred.home_value }}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size:11px;color:#999;">{{ game.away_team | truncate(3, True, '') }}</td>
+                  <td></td>
+                  <td style="font-size:11px;color:#999;text-align:right;">{{ game.home_team | truncate(3, True, '') }}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        {% endfor %}
+
+      </td>
+    </tr>
+    {% endfor %}
+
+    <!-- Footer -->
+    <tr>
+      <td style="background:#f9f9f9;padding:16px 32px;text-align:center;border-top:1px solid #e8e8e8;">
+        <p style="margin:0;font-size:11px;color:#aaa;">
+          Predictions are for entertainment purposes only. Model-generated win
+          probabilities based on historical data and are not guaranteed.
+        </p>
+      </td>
+    </tr>
+
+  </table>
+
+</td></tr>
+</table>
+
+</body>
+</html>

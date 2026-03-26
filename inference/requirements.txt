@@ -1,0 +1,5 @@
+boto3>=1.34
+polars>=1.0
+xgboost>=2.1
+jinja2>=3.1
+MLB-StatsAPI>=1.7

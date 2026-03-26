@@ -54,6 +54,7 @@ MlStack(
 InferenceStack(
     app,
     "BasesLoadedInference",
+    data_bucket=shared.data_bucket,
     models_bucket=shared.models_bucket,
     game_day_table=shared.game_day_table,
     notifications_topic=shared.notifications_topic,

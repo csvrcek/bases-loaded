@@ -94,14 +94,24 @@ def merge_and_deduplicate(
 REGULAR_GAME_TYPES = {"R", "F", "D", "L", "W"}  # Regular season + postseason
 
 
+UPCOMING_STATUSES = {"Scheduled", "Pre-Game", "Preview", "Warmup"}
+
+
 def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
-    """Build game_logs DataFrame from statsapi schedule data."""
+    """Build game_logs DataFrame from statsapi schedule data.
+
+    Includes completed (Final) games with scores, and upcoming (Scheduled/
+    Pre-Game) games with null scores — needed by processing to compute
+    inference features before game time.
+    """
     rows = []
     for g in games:
         if g.get("game_type", "") not in REGULAR_GAME_TYPES:
             continue
-        # Only include completed games
-        if g.get("status", "") != "Final":
+        status = g.get("status", "")
+        is_final = status == "Final"
+        is_upcoming = status in UPCOMING_STATUSES
+        if not is_final and not is_upcoming:
             continue
         rows.append(
             {
@@ -110,13 +120,13 @@ def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
                 "season": season,
                 "home_team": get_team_abbrev(g.get("home_name", "")),
                 "away_team": get_team_abbrev(g.get("away_name", "")),
-                "home_score": g.get("home_score", 0),
-                "away_score": g.get("away_score", 0),
+                "home_score": g.get("home_score", 0) if is_final else None,
+                "away_score": g.get("away_score", 0) if is_final else None,
                 "venue_name": g.get("venue_name", ""),
                 "venue_id": str(g.get("venue_id", "")),
                 "home_sp_id": str(g.get("home_probable_pitcher", "")),
                 "away_sp_id": str(g.get("away_probable_pitcher", "")),
-                "status": g.get("status", ""),
+                "status": status,
             }
         )
     if not rows:
@@ -252,8 +262,9 @@ def handler(event, context):
     Both dates must be within the same year. Season is derived from the year.
     """
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%m/%d/%Y")
+    today = datetime.now(timezone.utc).strftime("%m/%d/%Y")
     start_date = event.get("start_date", yesterday)
-    end_date = event.get("end_date", start_date)
+    end_date = event.get("end_date", today)
 
     start_year = int(start_date.split("/")[2])
     end_year = int(end_date.split("/")[2])
