@@ -60,6 +60,7 @@ class InferenceStack(Stack):
                 "DYNAMODB_TABLE": game_day_table.table_name,
                 "SSM_SUBSCRIBERS_PARAM": "/bases-loaded/subscribers",
                 "SSM_SENDER_PARAM": "/bases-loaded/ses-sender",
+                "SNS_TOPIC_ARN": notifications_topic.topic_arn,
             },
         )
 
@@ -81,6 +82,7 @@ class InferenceStack(Stack):
                 resources=["*"],
             )
         )
+        notifications_topic.grant_publish(predict_fn)
 
         # --- EventBridge Scheduler group for one-time inference triggers ---
 
@@ -118,11 +120,13 @@ class InferenceStack(Stack):
                 "PREDICT_FUNCTION_ARN": predict_fn.function_arn,
                 "SCHEDULER_ROLE_ARN": scheduler_role.role_arn,
                 "SCHEDULER_GROUP": SCHEDULER_GROUP,
+                "SNS_TOPIC_ARN": notifications_topic.topic_arn,
             },
         )
 
         # Slate fetcher permissions
         data_bucket.grant_read_write(slate_fetcher_fn)
+        notifications_topic.grant_publish(slate_fetcher_fn)
         slate_fetcher_fn.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[

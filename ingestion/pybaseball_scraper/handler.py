@@ -12,6 +12,8 @@ import boto3
 import polars as pl
 import pybaseball
 
+from shared.alerting import sns_alert
+
 S3_BUCKET = os.environ["S3_BUCKET_DATA"]
 S3_PREFIX = "raw"
 
@@ -192,6 +194,7 @@ def fetch_park_factors() -> pl.DataFrame:
         )
 
 
+@sns_alert("PyBaseball Scraper")
 def handler(event, context):
     """Lambda handler. Expects event with 'season'."""
     season = int(event.get("season", datetime.now(timezone.utc).year))

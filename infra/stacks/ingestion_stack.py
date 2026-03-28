@@ -76,9 +76,11 @@ class IngestionStack(Stack):
             environment={
                 "S3_BUCKET_DATA": data_bucket.bucket_name,
                 "HOME": "/tmp",
+                "SNS_TOPIC_ARN": notifications_topic.topic_arn,
             },
         )
         data_bucket.grant_read_write(pybaseball_fn)
+        notifications_topic.grant_publish(pybaseball_fn)
 
         # --- Weather Scraper (Docker Lambda) ---
 
@@ -102,6 +104,15 @@ class IngestionStack(Stack):
         data_bucket.grant_read_write(weather_fn)
 
         # --- Step Functions: Daily ingestion (MLB Stats → Weather, sequential) ---
+
+        notify_start = tasks.SnsPublish(
+            self,
+            "NotifyStart",
+            topic=notifications_topic,
+            message=sfn.TaskInput.from_text("Daily ingestion pipeline started."),
+            subject="Bases Loaded: Daily Ingestion Started",
+            result_path="$.notifyStart",
+        )
 
         mlb_stats_task = tasks.LambdaInvoke(
             self,
@@ -174,8 +185,8 @@ class IngestionStack(Stack):
             .next(emit_completion)
         )
 
-        # MLB Stats runs first, then branch on whether games were found
-        definition = mlb_stats_task.next(check_games)
+        # Start notification → MLB Stats → branch on whether games were found
+        definition = notify_start.next(mlb_stats_task).next(check_games)
         failure_chain = notify_failure.next(fail_state)
         mlb_stats_task.add_catch(
             failure_chain,

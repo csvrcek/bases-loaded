@@ -17,6 +17,7 @@ import xgboost as xgb
 
 from inference.predict.email_renderer import render_prediction_email
 from inference.predict.preprocess import preprocess_for_inference
+from shared.alerting import sns_alert
 from shared.config import AWS_REGION
 
 S3_BUCKET_DATA = os.environ["S3_BUCKET_DATA"]
@@ -130,6 +131,7 @@ def send_email(subject: str, html_body: str, sender: str, recipients: list[str])
 # ── Handler ──────────────────────────────────────────────────────────
 
 
+@sns_alert("Predict")
 def handler(event, context):
     """Run inference for today's games and email predictions."""
     game_date = event.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))

@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import statsapi
 
+from shared.alerting import sns_alert
+
 S3_BUCKET = os.environ["S3_BUCKET_DATA"]
 PREDICT_FUNCTION_ARN = os.environ["PREDICT_FUNCTION_ARN"]
 SCHEDULER_ROLE_ARN = os.environ["SCHEDULER_ROLE_ARN"]
@@ -24,6 +26,7 @@ scheduler = boto3.client("scheduler")
 REGULAR_GAME_TYPES = {"R", "F", "D", "L", "W"}
 
 
+@sns_alert("Slate Fetcher")
 def handler(event, context):
     """Fetch today's MLB slate and schedule the predict Lambda."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

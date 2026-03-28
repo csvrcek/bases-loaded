@@ -145,7 +145,11 @@ class MlStack(Stack):
             code=_lambda.Code.from_asset(str(RUNTIME_DIR / "spot_launcher")),
             role=launcher_role,
             timeout=Duration.seconds(30),
+            environment={
+                "SNS_TOPIC_ARN": notifications_topic.topic_arn,
+            },
         )
+        notifications_topic.grant_publish(launcher_fn)
 
         # --- EventBridge Scheduler: trigger weekly training ---
 
