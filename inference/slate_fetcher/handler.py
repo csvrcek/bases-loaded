@@ -46,6 +46,16 @@ def handler(event, context):
 
     if not upcoming:
         print("No upcoming games today — nothing to schedule.")
+
+        topic_arn = os.environ.get("SNS_TOPIC_ARN")
+        if topic_arn:
+            sns = boto3.client("sns")
+            sns.publish(
+                TopicArn=topic_arn,
+                Subject="Bases Loaded: No Games Today",
+                Message=f"No MLB games scheduled for {today}. The prediction pipeline will not run today.",
+            )
+
         return {"status": "no_games", "date": today}
 
     # Build slate metadata for the predict Lambda
