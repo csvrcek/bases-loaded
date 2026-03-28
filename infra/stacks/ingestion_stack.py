@@ -213,7 +213,7 @@ class IngestionStack(Stack):
             "DailySchedulerRole",
             assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"),
         )
-        state_machine.grant_start_sync_execution(daily_scheduler_role)
+        state_machine.grant_start_execution(daily_scheduler_role)
 
         scheduler.CfnSchedule(
             self,
