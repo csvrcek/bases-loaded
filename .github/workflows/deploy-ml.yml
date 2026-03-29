@@ -8,6 +8,7 @@ on:
       - "shared/**"
       - "infra/app.py"
       - "infra/stacks/ml_stack.py"
+      - "infra/runtime/**"
       - ".github/workflows/deploy-ml.yml"
   workflow_dispatch:
 
