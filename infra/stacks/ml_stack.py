@@ -86,6 +86,7 @@ class MlStack(Stack):
             .replace("{repo_name}", repo_name)
             .replace("{region}", self.region)
             .replace("{sns_topic_arn}", notifications_topic.topic_arn)
+            .replace("{s3_bucket_models}", models_bucket.bucket_name)
         )
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(user_data_script)

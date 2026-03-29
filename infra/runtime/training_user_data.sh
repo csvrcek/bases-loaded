@@ -6,6 +6,7 @@ exec > /var/log/ml-training.log 2>&1
 
 REGION="{region}"
 SNS_TOPIC="{sns_topic_arn}"
+export S3_BUCKET_MODELS="{s3_bucket_models}"
 INSTANCE_ID=$(ec2-metadata -i | cut -d' ' -f2)
 
 notify() {
