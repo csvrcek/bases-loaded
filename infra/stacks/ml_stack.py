@@ -137,6 +137,19 @@ class MlStack(Stack):
                 resources=["*"],
             )
         )
+        launcher_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["iam:CreateServiceLinkedRole"],
+                resources=[
+                    f"arn:aws:iam::{self.account}:role/aws-service-role/spot.amazonaws.com/*",
+                ],
+                conditions={
+                    "StringEquals": {
+                        "iam:AWSServiceName": "spot.amazonaws.com",
+                    }
+                },
+            )
+        )
 
         launcher_fn = _lambda.Function(
             self,
