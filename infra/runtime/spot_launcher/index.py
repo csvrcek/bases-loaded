@@ -23,6 +23,7 @@ def handler(event, context):
         response = ec2.run_instances(
             LaunchTemplate={
                 "LaunchTemplateName": "bases-loaded-ml-training",
+                "Version": "$Latest",
             },
             MinCount=1,
             MaxCount=1,
