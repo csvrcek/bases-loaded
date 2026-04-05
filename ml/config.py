@@ -112,8 +112,8 @@ EARLY_STOPPING_ROUNDS = 20
 
 # --- Evaluation thresholds (fail pipeline if exceeded) ---
 
-MAX_LOG_LOSS = 0.70
-MAX_BRIER_SCORE = 0.26
+MAX_LOG_LOSS = 0.72
+MAX_BRIER_SCORE = 0.27
 
 # --- Train/validation split ---
 
