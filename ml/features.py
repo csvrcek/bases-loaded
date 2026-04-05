@@ -5,36 +5,53 @@ import polars as pl
 from ml.config import (
     ALL_NUMERIC_FEATURES,
     CATEGORICAL_FEATURES,
+    CATEGORICAL_VALUES,
     NON_FEATURE_COLS,
     TARGET_COL,
 )
 
 
-def preprocess(df: pl.DataFrame) -> pl.DataFrame:
-    """Encode categoricals, handle nulls, and return a model-ready DataFrame."""
-    # One-hot encode categorical columns
+def _one_hot_encode(df: pl.DataFrame) -> pl.DataFrame:
+    """Deterministic one-hot encoding using known categorical values."""
     for col in CATEGORICAL_FEATURES:
+        values = CATEGORICAL_VALUES.get(col, [])
+        for val in values:
+            dummy_col = f"{col}_{val}"
+            if col in df.columns:
+                df = df.with_columns(
+                    (pl.col(col).cast(pl.Utf8) == val).cast(pl.Float64).alias(dummy_col)
+                )
+            else:
+                df = df.with_columns(pl.lit(0.0).alias(dummy_col))
         if col in df.columns:
-            dummies = df.select(pl.col(col).to_physical().cast(pl.Utf8)).to_dummies(separator="_")
-            # Prefix dummy columns with original column name for clarity
-            dummies = dummies.rename(
-                {c: f"{col}_{c}" if not c.startswith(col) else c for c in dummies.columns}
-            )
-            df = pl.concat([df, dummies], how="horizontal")
             df = df.drop(col)
+    return df
 
-    # Fill numeric nulls with column median
+
+def preprocess(df: pl.DataFrame) -> tuple[pl.DataFrame, dict]:
+    """Encode categoricals, handle nulls, and return a model-ready DataFrame.
+
+    Returns:
+        Tuple of (processed DataFrame, metadata dict with medians for each
+        numeric feature).
+    """
+    # One-hot encode categorical columns using fixed value lists
+    df = _one_hot_encode(df)
+
+    # Fill numeric nulls with column median and collect medians for inference
+    medians = {}
     numeric_cols = [c for c in ALL_NUMERIC_FEATURES if c in df.columns]
     for col in numeric_cols:
+        median_val = df[col].median()
+        medians[col] = float(median_val) if median_val is not None else 0.0
         null_count = df[col].null_count()
         if null_count > 0:
             null_pct = null_count / len(df)
             if null_pct > 0.10:
                 print(f"WARNING: {col} has {null_pct:.1%} null values")
-            median_val = df[col].median()
             df = df.with_columns(pl.col(col).fill_null(median_val))
 
-    return df
+    return df, {"medians": medians}
 
 
 def split_features_target(df: pl.DataFrame) -> tuple[pl.DataFrame, pl.Series]:

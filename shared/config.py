@@ -5,6 +5,7 @@ DYNAMODB_TABLE_GAME_DAY_STATE = os.environ.get("DYNAMODB_TABLE", "GameDayState")
 S3_BUCKET_DATA = os.environ.get("S3_BUCKET_DATA", "bases-loaded-data")
 S3_BUCKET_MODELS = os.environ.get("S3_BUCKET_MODELS", "bases-loaded-models")
 S3_MODEL_KEY = "latest_model.json"
+S3_PREPROCESSING_METADATA_KEY = "preprocessing_metadata.json"
 
 # SSM Parameter Store keys for inference
 SSM_SUBSCRIBERS_PARAM = "/bases-loaded/subscribers"

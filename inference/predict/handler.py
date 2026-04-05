@@ -23,6 +23,9 @@ from shared.config import AWS_REGION
 S3_BUCKET_DATA = os.environ["S3_BUCKET_DATA"]
 S3_BUCKET_MODELS = os.environ["S3_BUCKET_MODELS"]
 S3_MODEL_KEY = os.environ.get("S3_MODEL_KEY", "latest_model.json")
+S3_PREPROCESSING_METADATA_KEY = os.environ.get(
+    "S3_PREPROCESSING_METADATA_KEY", "preprocessing_metadata.json"
+)
 DYNAMODB_TABLE = os.environ["DYNAMODB_TABLE"]
 SSM_SUBSCRIBERS_PARAM = os.environ.get(
     "SSM_SUBSCRIBERS_PARAM", "/bases-loaded/subscribers"
@@ -59,6 +62,20 @@ def load_model() -> xgb.Booster:
     booster.load_model(local_path)
     print(f"Loaded model from s3://{S3_BUCKET_MODELS}/{S3_MODEL_KEY}")
     return booster
+
+
+def load_preprocessing_metadata() -> dict | None:
+    """Download preprocessing metadata (medians, etc.) from S3."""
+    local_path = "/tmp/preprocessing_metadata.json"
+    try:
+        s3.download_file(S3_BUCKET_MODELS, S3_PREPROCESSING_METADATA_KEY, local_path)
+        with open(local_path) as f:
+            metadata = json.load(f)
+        print(f"Loaded preprocessing metadata from s3://{S3_BUCKET_MODELS}/{S3_PREPROCESSING_METADATA_KEY}")
+        return metadata
+    except Exception as e:
+        print(f"WARNING: Could not load preprocessing metadata: {e}")
+        return None
 
 
 def fetch_features(game_date: str) -> list[dict]:
@@ -138,9 +155,10 @@ def handler(event, context):
 
     print(f"Running inference for {game_date}")
 
-    # 1. Load model
+    # 1. Load model and preprocessing metadata
     booster = load_model()
     expected_features = booster.feature_names
+    preprocessing_metadata = load_preprocessing_metadata()
 
     # 2. Fetch features from DynamoDB
     items = fetch_features(game_date)
@@ -162,11 +180,16 @@ def handler(event, context):
     df = pl.DataFrame(items)
     game_ids = df["game_id"].to_list()
 
-    X = preprocess_for_inference(df, expected_features)
+    print(f"Raw DynamoDB columns ({len(df.columns)}): {sorted(df.columns)}")
+
+    X, preprocess_diagnostics = preprocess_for_inference(
+        df, expected_features, preprocessing_metadata
+    )
     dmatrix = xgb.DMatrix(X.to_numpy(), feature_names=expected_features)
     home_win_probs = booster.predict(dmatrix)
 
     print(f"Generated predictions for {len(home_win_probs)} games")
+    print(f"Preprocessing diagnostics: {preprocess_diagnostics}")
 
     # 5. Build email data
     games_for_email = []
@@ -224,4 +247,6 @@ def handler(event, context):
         "date": game_date,
         "games_predicted": len(games_for_email),
         "emails_sent": len(recipients),
+        "preprocessing_diagnostics": preprocess_diagnostics,
+        "has_preprocessing_metadata": preprocessing_metadata is not None,
     }

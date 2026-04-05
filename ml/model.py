@@ -1,5 +1,7 @@
 """XGBoost model training, evaluation, and persistence."""
 
+import json
+
 import polars as pl
 import xgboost as xgb
 from sklearn.metrics import brier_score_loss, log_loss
@@ -64,4 +66,12 @@ def save_model(booster: xgb.Booster, path: str) -> str:
     """Save XGBoost model in JSON format."""
     booster.save_model(path)
     print(f"Model saved to {path}")
+    return path
+
+
+def save_preprocessing_metadata(metadata: dict, path: str) -> str:
+    """Save preprocessing metadata (medians, etc.) as JSON."""
+    with open(path, "w") as f:
+        json.dump(metadata, f, indent=2)
+    print(f"Preprocessing metadata saved to {path}")
     return path

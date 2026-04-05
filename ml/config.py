@@ -47,6 +47,14 @@ CATEGORICAL_FEATURES = [
     "weather_wind_dir",     # In / Out / Cross L-R / etc.
 ]
 
+# Explicit known values for each categorical feature (used for deterministic
+# one-hot encoding at both training and inference time).
+CATEGORICAL_VALUES = {
+    "home_sp_handedness": ["L", "R"],
+    "away_sp_handedness": ["L", "R"],
+    "weather_wind_dir": ["In", "Out", "Cross L-R", "Cross R-L", "None"],
+}
+
 # Game-level contextual features (no home/away prefix)
 CONTEXTUAL_NUMERIC = [
     "park_factor_runs",
