@@ -94,6 +94,14 @@ def merge_and_deduplicate(
 REGULAR_GAME_TYPES = {"R", "F", "D", "L", "W"}  # Regular season + postseason
 
 
+def _safe_int(val) -> int:
+    """Convert a value to int, handling string numbers from boxscore data."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return 0
+
+
 UPCOMING_STATUSES = {"Scheduled", "Pre-Game", "Preview", "Warmup"}
 
 
@@ -213,7 +221,12 @@ def build_schedules(games: list[dict], season: int) -> pl.DataFrame:
 
 
 def fetch_pitcher_game_logs(game_id: str, game_date: str, season: int) -> list[dict]:
-    """Fetch pitcher boxscore data for a single game."""
+    """Fetch pitcher boxscore data for a single game.
+
+    statsapi.boxscore_data() returns flat dicts per pitcher. The first entry
+    in {side}Pitchers is a header row (personId=0) — skip it. The second
+    entry is the starting pitcher.
+    """
     rows = []
     try:
         box = statsapi.boxscore_data(game_id)
@@ -221,18 +234,24 @@ def fetch_pitcher_game_logs(game_id: str, game_date: str, season: int) -> list[d
         print(f"WARNING: Could not fetch boxscore for game {game_id}: {e}")
         return rows
 
+    team_info = box.get("teamInfo", {})
+
     for side in ["home", "away"]:
-        team_abbrev = get_team_abbrev(box.get(f"{side}Team", {}).get("name", ""))
+        team_abbrev = team_info.get(side, {}).get("abbreviation", "")
         pitchers = box.get(f"{side}Pitchers", [])
-        for i, p in enumerate(pitchers):
-            pid = p.get("personId", p.get("id", 0))
-            stats = p.get("stats", {}).get("pitching", {})
-            # Parse innings pitched (e.g., "6.1" means 6 and 1/3)
-            ip_str = stats.get("inningsPitched", "0")
+        # Skip header row (personId == 0) at index 0
+        actual_pitchers = [p for p in pitchers if p.get("personId", 0) != 0]
+        for i, p in enumerate(actual_pitchers):
+            pid = p.get("personId", 0)
+            # Stats are flat keys: ip, h, r, er, bb, k, hr, p (pitches), s (strikes)
+            ip_str = p.get("ip", "0")
             try:
                 ip = float(ip_str)
             except (ValueError, TypeError):
                 ip = 0.0
+            hits = _safe_int(p.get("h", 0))
+            walks = _safe_int(p.get("bb", 0))
+            strikeouts = _safe_int(p.get("k", 0))
             rows.append(
                 {
                     "pitcher_id": str(pid),
@@ -244,20 +263,24 @@ def fetch_pitcher_game_logs(game_id: str, game_date: str, season: int) -> list[d
                     "handedness": "",  # filled from roster data if available
                     "is_closer": False,  # heuristic: set later
                     "innings_pitched": ip,
-                    "strikeouts": int(stats.get("strikeOuts", 0)),
-                    "walks": int(stats.get("baseOnBalls", 0)),
-                    "earned_runs": int(stats.get("earnedRuns", 0)),
-                    "hits_allowed": int(stats.get("hits", 0)),
-                    "home_runs_allowed": int(stats.get("homeRuns", 0)),
-                    "pitches": int(stats.get("pitchesThrown", stats.get("numberOfPitches", 0))),
-                    "batters_faced": int(stats.get("battersFaced", 0)),
+                    "strikeouts": strikeouts,
+                    "walks": walks,
+                    "earned_runs": _safe_int(p.get("er", 0)),
+                    "hits_allowed": hits,
+                    "home_runs_allowed": _safe_int(p.get("hr", 0)),
+                    "pitches": _safe_int(p.get("p", 0)),
+                    "batters_faced": hits + walks + strikeouts,
                 }
             )
     return rows
 
 
 def fetch_team_batting(game_id: str, game_date: str, season: int) -> list[dict]:
-    """Fetch team batting totals from boxscore for a single game."""
+    """Fetch team batting totals from boxscore for a single game.
+
+    Batting totals use flat keys (ab, h, r, hr, bb, k). Doubles and triples
+    are not in the totals row — sum them from individual batter rows instead.
+    """
     rows = []
     try:
         box = statsapi.boxscore_data(game_id)
@@ -265,23 +288,31 @@ def fetch_team_batting(game_id: str, game_date: str, season: int) -> list[dict]:
         print(f"WARNING: Could not fetch boxscore for game {game_id}: {e}")
         return rows
 
+    team_info = box.get("teamInfo", {})
+
     for side in ["home", "away"]:
-        team_abbrev = get_team_abbrev(box.get(f"{side}Team", {}).get("name", ""))
+        team_abbrev = team_info.get(side, {}).get("abbreviation", "")
         totals = box.get(f"{side}BattingTotals", {})
+        # Sum doubles/triples from individual batters (skip header row)
+        batters = [b for b in box.get(f"{side}Batters", []) if b.get("personId", 0) != 0]
+        doubles = sum(_safe_int(b.get("doubles", 0)) for b in batters)
+        triples = sum(_safe_int(b.get("triples", 0)) for b in batters)
+        ab = _safe_int(totals.get("ab", 0))
+        bb = _safe_int(totals.get("bb", 0))
         rows.append(
             {
                 "team": team_abbrev,
                 "game_id": str(game_id),
                 "game_date": game_date,
                 "season": season,
-                "plate_appearances": int(totals.get("plateAppearances", totals.get("atBats", 0))),
-                "at_bats": int(totals.get("atBats", 0)),
-                "hits": int(totals.get("hits", 0)),
-                "doubles": int(totals.get("doubles", 0)),
-                "triples": int(totals.get("triples", 0)),
-                "home_runs": int(totals.get("homeRuns", 0)),
-                "strikeouts": int(totals.get("strikeOuts", 0)),
-                "walks": int(totals.get("baseOnBalls", 0)),
+                "plate_appearances": ab + bb,
+                "at_bats": ab,
+                "hits": _safe_int(totals.get("h", 0)),
+                "doubles": doubles,
+                "triples": triples,
+                "home_runs": _safe_int(totals.get("hr", 0)),
+                "strikeouts": _safe_int(totals.get("k", 0)),
+                "walks": bb,
             }
         )
     return rows
