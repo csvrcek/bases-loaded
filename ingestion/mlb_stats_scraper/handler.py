@@ -97,7 +97,40 @@ REGULAR_GAME_TYPES = {"R", "F", "D", "L", "W"}  # Regular season + postseason
 UPCOMING_STATUSES = {"Scheduled", "Pre-Game", "Preview", "Warmup"}
 
 
-def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
+def fetch_probable_pitcher_ids(start_date: str, end_date: str) -> dict[str, dict]:
+    """Fetch probable pitcher numeric IDs from the hydrated schedule API.
+
+    Returns dict mapping game_id -> {"home_sp_id": str, "away_sp_id": str}.
+    """
+    pitcher_ids = {}
+    try:
+        data = statsapi.get(
+            "schedule",
+            {
+                "startDate": start_date,
+                "endDate": end_date,
+                "sportId": 1,
+                "hydrate": "probablePitcher",
+            },
+        )
+        for date_entry in data.get("dates", []):
+            for game in date_entry.get("games", []):
+                gid = str(game.get("gamePk", ""))
+                teams = game.get("teams", {})
+                home_pp = teams.get("home", {}).get("probablePitcher", {})
+                away_pp = teams.get("away", {}).get("probablePitcher", {})
+                pitcher_ids[gid] = {
+                    "home_sp_id": str(home_pp.get("id", "")) if home_pp else "",
+                    "away_sp_id": str(away_pp.get("id", "")) if away_pp else "",
+                }
+    except Exception as e:
+        print(f"WARNING: Could not fetch probable pitcher IDs: {e}")
+    return pitcher_ids
+
+
+def build_game_logs(
+    games: list[dict], season: int, pitcher_ids: dict[str, dict] | None = None
+) -> pl.DataFrame:
     """Build game_logs DataFrame from statsapi schedule data.
 
     Includes completed (Final) games with scores, and upcoming (Scheduled/
@@ -124,8 +157,8 @@ def build_game_logs(games: list[dict], season: int) -> pl.DataFrame:
                 "away_score": g.get("away_score", 0) if is_final else None,
                 "venue_name": g.get("venue_name", ""),
                 "venue_id": str(g.get("venue_id", "")),
-                "home_sp_id": str(g.get("home_probable_pitcher", "")),
-                "away_sp_id": str(g.get("away_probable_pitcher", "")),
+                "home_sp_id": (pitcher_ids or {}).get(str(g["game_id"]), {}).get("home_sp_id", ""),
+                "away_sp_id": (pitcher_ids or {}).get(str(g["game_id"]), {}).get("away_sp_id", ""),
                 "status": status,
             }
         )
@@ -282,9 +315,13 @@ def handler(event, context):
         print("No games found, exiting")
         return {"status": "no_games", "start_date": start_date, "end_date": end_date}
 
+    # --- Fetch probable pitcher IDs (numeric) from hydrated API ---
+    pitcher_ids = fetch_probable_pitcher_ids(start_date, end_date)
+    print(f"Fetched probable pitcher IDs for {len(pitcher_ids)} games")
+
     # --- Game Logs ---
     game_logs_key = f"{S3_PREFIX}/game_logs/{season}/game_logs.parquet"
-    game_logs_df = build_game_logs(games, season)
+    game_logs_df = build_game_logs(games, season, pitcher_ids)
     if len(game_logs_df) > 0:
         existing = read_existing(game_logs_key)
         merged = merge_and_deduplicate(existing, game_logs_df, "game_id")
