@@ -133,8 +133,13 @@ def _build_team_features(
         pl.col(opp_hand_col).alias("opp_hand"),
     )
 
-    # Join rolling stats
-    result = base.join(team_rolling, on=["team", "date"], how="left")
+    # Join rolling stats (join_asof to get most recent values for upcoming games)
+    result = base.sort("date").join_asof(
+        team_rolling.sort("date"),
+        on="date",
+        by="team",
+        strategy="backward",
+    )
 
     # Join FanGraphs split stats (wRC+ and wOBA vs opposing SP handedness)
     if len(team_batting_splits) > 0:

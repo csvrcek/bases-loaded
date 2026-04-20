@@ -132,13 +132,25 @@ def compute_sp_features(
 
     home_sp = (
         games.select("game_id", "date", pl.col("home_sp_id").alias("pitcher_id"))
-        .join(pitcher_features, on=["pitcher_id", "date"], how="left")
+        .sort("date")
+        .join_asof(
+            pitcher_features.sort("date"),
+            on="date",
+            by="pitcher_id",
+            strategy="backward",
+        )
         .select("game_id", *[pl.col(c).alias(f"home_{c}") for c in SP_FEATURE_COLS])
     )
 
     away_sp = (
         games.select("game_id", "date", pl.col("away_sp_id").alias("pitcher_id"))
-        .join(pitcher_features, on=["pitcher_id", "date"], how="left")
+        .sort("date")
+        .join_asof(
+            pitcher_features.sort("date"),
+            on="date",
+            by="pitcher_id",
+            strategy="backward",
+        )
         .select("game_id", *[pl.col(c).alias(f"away_{c}") for c in SP_FEATURE_COLS])
     )
 
