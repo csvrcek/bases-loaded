@@ -11,7 +11,7 @@ INSTANCE_ID=$(ec2-metadata -i | cut -d' ' -f2)
 
 notify() {
     aws sns publish --region "$REGION" --topic-arn "$SNS_TOPIC" \
-        --subject "ML Pipeline: $1" --message "$2"
+        --subject "Bases Loaded ML Pipeline: $1" --message "$2"
 }
 
 notify "Started" "Training pipeline started on instance $INSTANCE_ID."
