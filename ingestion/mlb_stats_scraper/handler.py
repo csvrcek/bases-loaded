@@ -18,6 +18,10 @@ S3_PREFIX = "raw"
 
 s3 = boto3.client("s3")
 
+# Pitcher throwing hand is static per pitcher, so cache lookups across the game
+# loop (and warm Lambda invocations) to collapse repeat calls into one per pitcher.
+_PITCHER_HAND_CACHE: dict[str, str] = {}
+
 # MLB team abbreviation mapping (statsapi uses full names)
 TEAM_ABBREV = {
     "Arizona Diamondbacks": "ARI",
@@ -220,6 +224,30 @@ def build_schedules(games: list[dict], season: int) -> pl.DataFrame:
     return pl.DataFrame(rows).unique(subset=["team", "game_date"], keep="last")
 
 
+def fetch_pitcher_handedness(pid: str) -> str:
+    """Fetch a pitcher's throwing hand ("L"/"R") from the MLB Stats API.
+
+    boxscore_data() doesn't include handedness, so look it up from the people
+    endpoint. Returns "" when unknown (switch/missing) or on error; results are
+    cached (including "") so a pitcher is only looked up once per invocation.
+    """
+    if pid in _PITCHER_HAND_CACHE:
+        return _PITCHER_HAND_CACHE[pid]
+
+    hand = ""
+    try:
+        data = statsapi.get("person", {"personId": pid})
+        people = data.get("people", [])
+        code = people[0].get("pitchHand", {}).get("code", "") if people else ""
+        if code in ("L", "R"):
+            hand = code
+    except Exception as e:
+        print(f"WARNING: Could not fetch handedness for pitcher {pid}: {e}")
+
+    _PITCHER_HAND_CACHE[pid] = hand
+    return hand
+
+
 def fetch_pitcher_game_logs(game_id: str, game_date: str, season: int) -> list[dict]:
     """Fetch pitcher boxscore data for a single game.
 
@@ -260,7 +288,7 @@ def fetch_pitcher_game_logs(game_id: str, game_date: str, season: int) -> list[d
                     "season": season,
                     "team": team_abbrev,
                     "role": "SP" if i == 0 else "RP",
-                    "handedness": "",  # filled from roster data if available
+                    "handedness": fetch_pitcher_handedness(str(pid)),
                     "is_closer": False,  # heuristic: set later
                     "innings_pitched": ip,
                     "strikeouts": strikeouts,

@@ -125,10 +125,17 @@ def _enrich_sp_handedness(
         how="left",
     )
 
-    # Default to R if handedness unknown
+    # Default to R if handedness unknown (null from a missing join, or "" from a
+    # lookup failure / pre-fix parquet rows). Only "L"/"R" pass through.
     return enriched.with_columns(
-        pl.col("home_sp_hand").fill_null("R"),
-        pl.col("away_sp_hand").fill_null("R"),
+        pl.when(pl.col("home_sp_hand").is_in(["L", "R"]))
+        .then(pl.col("home_sp_hand"))
+        .otherwise(pl.lit("R"))
+        .alias("home_sp_hand"),
+        pl.when(pl.col("away_sp_hand").is_in(["L", "R"]))
+        .then(pl.col("away_sp_hand"))
+        .otherwise(pl.lit("R"))
+        .alias("away_sp_hand"),
     )
 
 

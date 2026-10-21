@@ -20,7 +20,30 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest
+          pip install -r inference/requirements.txt
+
+      - name: Run tests
+        run: |
+          set +e
+          python -m pytest inference -q
+          code=$?
+          [ "$code" -eq 5 ] && { echo "No tests collected"; exit 0; }
+          exit "$code"
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

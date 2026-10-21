@@ -30,11 +30,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install -r ml/requirements.txt
+      - name: Install test dependencies
+        run: |
+          pip install pytest
+          pip install -r ml/requirements.txt
 
       - name: Validate imports
         run: python -c "from ml.config import XGBOOST_PARAM_SETS, ALL_NUMERIC_FEATURES; print(f'{len(ALL_NUMERIC_FEATURES)} features configured')"
+
+      - name: Run tests
+        run: |
+          set +e
+          python -m pytest ml -q
+          code=$?
+          [ "$code" -eq 5 ] && { echo "No tests collected"; exit 0; }
+          exit "$code"
 
   deploy:
     needs: test
